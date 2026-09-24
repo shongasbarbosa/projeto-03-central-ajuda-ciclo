@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: central_ajuda_ciclo
+          MYSQL_USER: central_ajuda_ciclo
+          MYSQL_PASSWORD: central_ajuda_ciclo
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: central_ajuda_ciclo
+      MYSQL_USER: central_ajuda_ciclo
+      MYSQL_PASSWORD: central_ajuda_ciclo
+      MYSQL_ROOT_PASSWORD: ""
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Instalar dependências
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Aguardar MySQL
+        run: |
+          for i in $(seq 1 20); do
+            mysqladmin ping -h127.0.0.1 -uroot --silent && break
+            sleep 2
+          done
+
+      - name: Testes (pytest)
+        run: pytest -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Checagem de tipos (vue-tsc)
+        run: npx vue-tsc -b
+
+      - name: Testes unitários (vitest)
+        run: npm run test:unit
+
+      - name: Build de produção
+        run: npm run build
