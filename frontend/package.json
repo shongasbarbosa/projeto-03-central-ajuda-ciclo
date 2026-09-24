@@ -10,6 +10,7 @@
     "lint": "eslint . --ext .vue,.ts",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:real": "cross-env PLAYWRIGHT_REAL_API=true playwright test e2e/real-api.spec.ts",
     "screenshots": "cross-env PLAYWRIGHT_SCREENSHOTS=true playwright test"
   },
   "dependencies": {
