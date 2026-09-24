@@ -20,7 +20,9 @@ class Command(BaseCommand):
                 return
             except OperationalError:
                 attempts += 1
-                self.stdout.write(f"Banco indisponível, tentando novamente ({attempts}/{max_attempts})...")
+                self.stdout.write(
+                    f"Banco indisponível, tentando novamente ({attempts}/{max_attempts})..."
+                )
                 time.sleep(2)
 
         raise SystemExit("Não foi possível conectar ao banco de dados a tempo.")
