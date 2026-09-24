@@ -1,0 +1,11 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+exclude = ["migrations", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]
+ignore = ["DJ001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["accounts", "offers", "tickets", "faq", "reports", "config"]

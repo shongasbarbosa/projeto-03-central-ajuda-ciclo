@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+backend/.venv/
+backend/venv/
+backend/staticfiles/
+backend/media/
+backend/db.sqlite3
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Django
+*.log
+local_settings.py
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+node_modules/
+*.tsbuildinfo
+
+# Testing / Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+**/docker-compose.override.yml
