@@ -1,0 +1,39 @@
+:root {
+  --cac-radius-sm: 12px;
+  --cac-radius-md: 14px;
+  --cac-radius-lg: 16px;
+
+  --cac-shadow-surface: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --cac-shadow-surface-hover: 0 2px 4px rgba(15, 23, 42, 0.08), 0 8px 20px rgba(15, 23, 42, 0.12);
+  --cac-surface-border: transparent;
+}
+
+:root[data-theme="dark"] {
+  --cac-shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.45);
+  --cac-shadow-surface-hover: 0 2px 6px rgba(0, 0, 0, 0.5), 0 10px 24px rgba(0, 0, 0, 0.5);
+  --cac-surface-border: rgba(255, 255, 255, 0.08);
+}
+
+.cac-surface {
+  border-radius: var(--cac-radius-md);
+  box-shadow: var(--cac-shadow-surface);
+  border: 1px solid var(--cac-surface-border);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.cac-surface--interactive:hover {
+  box-shadow: var(--cac-shadow-surface-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cac-surface {
+    transition: none;
+  }
+}
+
+.cac-demo-banner {
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 6px 12px;
+}
