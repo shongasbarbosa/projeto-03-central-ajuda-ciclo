@@ -22,9 +22,9 @@ export default defineConfigWithVueTs(
   {
     rules: {
       "vue/multi-word-component-names": "off",
-      // Vuetify usa nomes de slot com ponto (ex.: #item.status, #item.1), que o
-      // eslint-plugin-vue interpreta erroneamente como modificador de v-slot.
-      "vue/valid-v-slot": "off",
+      // Vuetify usa nomes de slot com ponto (ex.: #item.status, #item.1);
+      // allowModifiers aceita esse padrão em vez de desligar a regra.
+      "vue/valid-v-slot": ["error", { allowModifiers: true }],
     },
   }
 );
