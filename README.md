@@ -36,17 +36,26 @@ para perguntas que já têm resposta pronta na FAQ.
 - Login (com atalhos de demonstração)
 - Abertura de chamado em etapas: escolhe a oferta, categoriza e descreve o
   problema, e recebe sugestões de artigos da FAQ antes de enviar
-- Acompanhamento dos próprios chamados e conversa com o atendente
-- FAQ pesquisável com feedback de "útil" / "não útil"
+- Ao abrir um chamado, recebe um código de protocolo (`NNNNN-MM-AAAA`) que
+  pode copiar com um clique e usar depois para localizar o chamado
+- Acompanhamento dos próprios chamados, com busca por assunto, descrição ou
+  código de protocolo — os filtros aplicados persistem na URL
+- FAQ pesquisável com feedback de "útil" / "não útil", com filtros por
+  categoria e fase do ciclo que também persistem na URL
 
 ### Atendente
 
 - Fila de chamados com filtros por status, categoria, prioridade, fase do
-  ciclo e busca textual
+  ciclo e busca por assunto, descrição ou código de protocolo, com coluna de
+  código ordenável cronologicamente
+- Todos os filtros, a busca, a ordenação e a página atual persistem na URL
+  (sobrevivem a navegação, volta do navegador e recarregamento da página) e
+  podem ser limpos com um clique em "Limpar filtros"
 - Atribuição de chamados a si mesmo, resposta, notas internas (não
   visíveis ao aluno) e mudança de status/prioridade com transições
   validadas
-- Gestão da FAQ (criação, edição, publicação e exclusão de artigos)
+- Gestão da FAQ (criação, edição, publicação e exclusão de artigos), também
+  com filtros persistentes na URL
 - Painel de relatórios: volume de chamados por fase do ciclo, tempo médio
   de resolução por categoria e resumo por status
 
@@ -73,6 +82,18 @@ Todas capturadas no modo demonstração (Playwright, `npm run screenshots`).
 | Mobile (360px) |
 | --- |
 | ![Tela de meus chamados em 360px](docs/screenshots/09-mobile.png) |
+
+| Gestão da FAQ (atendente) |
+| --- |
+| ![Tela de gestão da FAQ pelo atendente](docs/screenshots/10-gerenciar-faq.png) |
+
+| Fila do atendente com filtros ativos | Busca por código de protocolo |
+| --- | --- |
+| ![Fila do atendente com filtros ativos e indicador de quantidade](docs/screenshots/11-fila-filtros-ativos.png) | ![Busca por código de protocolo com destaque de correspondência exata](docs/screenshots/12-busca-codigo.png) |
+
+| Detalhe do chamado com código de protocolo |
+| --- |
+| ![Detalhe do chamado mostrando o código de protocolo e o botão copiar código](docs/screenshots/13-detalhe-codigo.png) |
 
 ## Stack
 
@@ -106,6 +127,15 @@ Vuetify 3, Pinia, Vue Router (hash history), ECharts, Vitest, Playwright.
   sob a SIL Open Font License; hospedar os arquivos de fonte localmente
   evita dependência de um CDN externo e permite carregar só os pesos
   400/500/600/700 do subset latin.
+- **Contador dedicado (`TicketCodeCounter`) com `select_for_update()` para
+  o código do chamado**, em vez de derivar o sequencial de um `COUNT` ou do
+  próprio `id`. Um `COUNT` por mês teria condição de corrida sob
+  concorrência (duas requisições simultâneas podem ler a mesma contagem
+  antes de qualquer uma delas inserir sua linha), e o `id` autoincremento
+  não reinicia por mês nem é estável se um chamado for excluído. A tabela
+  de contador isolada, com uma linha por mês/ano bloqueada por
+  `select_for_update()` dentro de uma transação curta, serializa apenas o
+  incremento do sequencial — ver a seção "Código de protocolo do chamado".
 - **`cycle_phase_at_opening` gravado na abertura do chamado.** A fase do
   ciclo de uma oferta muda com o tempo (matrícula → andamento →
   encerramento). Se o relatório recalculasse a fase a partir da data atual,
@@ -238,6 +268,65 @@ Não é permitido fechar um chamado sem antes resolvê-lo — a validação é
 feita no backend (`Ticket.transition_to`) e replicada no frontend
 (`canTransitionTo`), inclusive no modo demonstração.
 
+## Código de protocolo do chamado
+
+Todo chamado recebe, na abertura, um código no formato **`NNNNN-MM-AAAA`**
+(sequencial de 5 dígitos, mês e ano), por exemplo `00042-09-2026`.
+
+- O sequencial reinicia em `00001` a cada mês e é único dentro do mês; mês e
+  ano são calculados no fuso `America/Sao_Paulo`, então um chamado aberto às
+  23h de 30/09 no horário de Brasília recebe o código de setembro mesmo que,
+  em UTC, já seja outro dia.
+- **Geração livre de duplicidade sob concorrência:** o sequencial é
+  controlado por uma tabela dedicada (`TicketCodeCounter`, uma linha por
+  mês/ano) atualizada dentro de uma transação com
+  `select_for_update()`. Isso serializa apenas o incremento do contador
+  (uma operação muito rápida), sem travar a tabela de chamados inteira, e
+  garante que dois chamados abertos ao mesmo tempo nunca recebam o mesmo
+  código — coberto por um teste automatizado que dispara 15 threads
+  simultâneas.
+- Chamados existentes antes desta funcionalidade foram migrados por uma
+  migration de dados que atribui os códigos em ordem cronológica de
+  abertura, mês a mês.
+- O código aparece na lista "Meus chamados", na fila do atendente (coluna
+  ordenável cronologicamente, não alfabeticamente — `00001-10-2026` é
+  posterior a `00042-09-2026`), no título do detalhe do chamado (com botão
+  "Copiar código"), no aviso de sucesso ao abrir um chamado, no
+  assunto/corpo do e-mail de mudança de status e no Django Admin.
+- **Busca por código:** o mesmo campo de busca aceita várias formas de
+  digitar o código, com ou sem zeros à esquerda e usando `-`, `/` ou espaço
+  como separador:
+  - código completo: `00042-09-2026`, `42/9/2026`, `42 9 2026`
+  - sequencial + mês (todos os anos): `00042-09`, `42/9`
+  - só o sequencial (todos os meses/anos): `42`, `#42`
+  - uma correspondência exata (sequencial + mês + ano) é destacada com um
+    atalho para abrir o chamado diretamente
+  - um aluno nunca encontra, por código ou qualquer outra busca, um chamado
+    de outro aluno — a busca resulta em lista vazia, sem revelar se o
+    código existe.
+
+## Filtros persistentes na URL
+
+Nas quatro telas com listas filtráveis (fila do atendente, "Meus
+chamados", FAQ do aluno e gestão de FAQ), o estado dos filtros — busca,
+seletores, ordenação, página e itens por página — fica na query string da
+própria rota (por exemplo,
+`#/atendente/fila?q=00042-09-2026&status=aberto&page=2`), sincronizado nos
+dois sentidos com `router.replace` (sem poluir o histórico do navegador a
+cada tecla digitada). Isso significa que:
+
+- sair da tela (por exemplo, abrir um chamado) e voltar mantém os mesmos
+  filtros, ordenação e página;
+- recarregar a página (F5) mantém o estado, porque ele vive na URL;
+- a URL com filtros aplicados pode ser copiada e compartilhada;
+- valores inválidos na URL (um status inexistente, por exemplo) são
+  ignorados silenciosamente, sem quebrar a tela;
+- os filtros só são limpos quando o campo é esvaziado, pelo "X" de cada
+  campo ou pelo botão "Limpar filtros" (visível apenas quando há algum
+  filtro ativo, ao lado de um indicador com a quantidade de filtros
+  ativos);
+- ao fazer logout, nenhum filtro fica retido para a próxima sessão.
+
 ## Endpoints da API
 
 Documentação interativa completa em `/api/docs` (Swagger) e `/api/redoc`
@@ -249,7 +338,7 @@ Documentação interativa completa em `/api/docs` (Swagger) e `/api/redoc`
 | POST   | `/api/auth/refresh`                    | Renova o access token                        |
 | GET    | `/api/auth/me`                         | Dados do usuário autenticado                 |
 | GET    | `/api/offers`                          | Lista ofertas com `cycle_phase` calculada    |
-| GET    | `/api/tickets`                         | Lista chamados (com filtros e busca)         |
+| GET    | `/api/tickets`                         | Lista chamados (filtros, ordenação e busca por assunto/descrição/código) |
 | POST   | `/api/tickets`                         | Abre um novo chamado                         |
 | GET    | `/api/tickets/{id}`                    | Detalhe do chamado                           |
 | PATCH  | `/api/tickets/{id}`                    | Atualiza status/prioridade/atribuição (atendente) |
@@ -365,18 +454,22 @@ ruff check .
 pytest -v
 ```
 
-50 testes cobrindo a regra de fase do ciclo, transições de status,
+94 testes cobrindo a regra de fase do ciclo, transições de status,
 permissões por papel (incluindo um aluno tentando acessar o chamado de
-outro aluno e ver notas internas), sugestões de FAQ, relatórios e
-idempotência do `seed_demo`. Os testes rodam contra um MySQL real (nunca
-SQLite).
+outro aluno e ver notas internas ou o código de outro aluno), geração e
+busca do código de protocolo (formato, reinício mensal, limite de fuso
+horário em `America/Sao_Paulo`, concorrência com 15 threads simultâneas,
+migração de dados e todas as variações de busca), sugestões de FAQ,
+relatórios (incluindo a ordem fixa e o total zero do relatório por
+prioridade) e idempotência do `seed_demo`. Os testes rodam contra um MySQL
+real (nunca SQLite).
 
 **Frontend** (`cd frontend`):
 
 ```bash
 npm run lint
 npx vue-tsc -b
-npm run test:unit      # Vitest — 25 testes
+npm run test:unit      # Vitest — 68 testes
 npm run build
 ```
 
@@ -389,8 +482,11 @@ PLAYWRIGHT_REAL_API=true npm run test:e2e:real  # contra a API real
 ```
 
 Cobrem login como aluno e como atendente, abertura de chamado, bloqueio de
-telas do atendente para o aluno e logout — tanto no modo demonstração
-quanto contra a API real servida pelo Docker.
+telas do atendente para o aluno e logout, geração/cópia/busca do código de
+protocolo (incluindo busca só pelo número retornando chamados de meses
+diferentes) e persistência de filtros na URL (navegação, recarregamento e
+limpeza) — tanto no modo demonstração quanto contra a API real servida
+pelo Docker.
 
 Há também `npm run test:e2e:published`, que roda contra o site já publicado
 no GitHub Pages (login como aluno e atendente, persistência de tema,
@@ -409,9 +505,10 @@ relatórios nos dois temas, FAQ e a tela em 360px).
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): em todo push e pull request para
-  `main`, roda `ruff` e `pytest` (com um MySQL 8.4 como service container)
-  para o backend, e `eslint`, `vue-tsc`, `vitest` e `vite build` para o
-  frontend.
+  `main`, roda `ruff`, `manage.py makemigrations --check --dry-run`,
+  `manage.py spectacular --validate --fail-on-warn` e `pytest` (com um
+  MySQL 8.4 como service container) para o backend, e `eslint`, `vue-tsc`,
+  `vitest` e `vite build` para o frontend.
 - **Deploy** (`.github/workflows/deploy.yml`): em todo push para `main`,
   builda o frontend em modo demonstração (`VITE_DEMO_MODE=true`) com o
   `base` `/projeto-03-central-ajuda-ciclo/` e publica no GitHub Pages.

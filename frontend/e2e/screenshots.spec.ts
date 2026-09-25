@@ -123,6 +123,39 @@ test.describe("Screenshots (modo demonstração)", () => {
     await captureFullPage(page, `${SHOTS_DIR}/10-gerenciar-faq.png`);
   });
 
+  test("fila do atendente com filtros ativos", async ({ page }) => {
+    await loginAs(page, "atendente");
+    await page.getByLabel("Status", { exact: true }).click({ force: true });
+    await page.getByRole("option", { name: "Aberto" }).click();
+    await page.waitForURL(/status=aberto/);
+    await expect(page.getByText("filtro(s) ativo(s)")).toBeVisible();
+    await captureFullPage(page, `${SHOTS_DIR}/11-fila-filtros-ativos.png`);
+  });
+
+  test("busca por codigo de protocolo", async ({ page }) => {
+    await loginAs(page, "atendente");
+    const firstRowCode = await page
+      .locator("table tbody tr")
+      .first()
+      .locator("td")
+      .first()
+      .innerText();
+    await page
+      .getByLabel("Buscar (assunto, descrição ou código)", { exact: true })
+      .fill(firstRowCode.trim());
+    await page.waitForURL(/q=/);
+    await expect(page.locator("table tbody tr")).toHaveCount(1);
+    await captureFullPage(page, `${SHOTS_DIR}/12-busca-codigo.png`);
+  });
+
+  test("detalhe do chamado com codigo de protocolo", async ({ page }) => {
+    await loginAs(page, "aluno");
+    await page.locator(".cac-surface--interactive").first().click();
+    await expect(page).toHaveURL(/#\/tickets\/\d+$/);
+    await expect(page.locator("h1")).toContainText(/\d{5}-\d{2}-\d{4}/);
+    await captureFullPage(page, `${SHOTS_DIR}/13-detalhe-codigo.png`);
+  });
+
   test("mobile 360px", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await loginAs(page, "aluno");
