@@ -3,7 +3,6 @@ import random
 from datetime import timedelta
 from pathlib import Path
 
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.db.utils import OperationalError, ProgrammingError
@@ -127,8 +126,28 @@ FAQ_ITEMS = [
 ]
 
 
+DEFAULT_EXPORT_PATH = (
+    Path(__file__).resolve().parents[4] / "frontend" / "src" / "demo-data" / "seed.json"
+)
+
+
 class Command(BaseCommand):
     help = "Popula o banco com dados de demonstração (ofertas, usuários, tickets e FAQ)."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--export-path",
+            default=None,
+            help=(
+                "Caminho do arquivo seed.json exportado para o frontend. "
+                f"Padrão: {DEFAULT_EXPORT_PATH}"
+            ),
+        )
+        parser.add_argument(
+            "--no-export",
+            action="store_true",
+            help="Não exporta o seed.json para o frontend.",
+        )
 
     def handle(self, *args, **options):
         self._ensure_migrated()
@@ -147,8 +166,14 @@ class Command(BaseCommand):
         self.stdout.write("Criando tickets...")
         self._seed_tickets(offers_by_phase, [student, *extra_students], [agent, *extra_agents])
 
-        self.stdout.write("Exportando dados para o frontend (modo demonstração)...")
-        self._export_seed_json()
+        if options["no_export"]:
+            self.stdout.write("Exportação do seed.json desativada (--no-export).")
+        else:
+            self.stdout.write("Exportando dados para o frontend (modo demonstração)...")
+            export_path = (
+                Path(options["export_path"]) if options["export_path"] else DEFAULT_EXPORT_PATH
+            )
+            self._export_seed_json(export_path)
 
         self.stdout.write(self.style.SUCCESS("Seed de demonstração concluído."))
 
@@ -378,7 +403,7 @@ class Command(BaseCommand):
 
         self.stdout.write(f"  {to_create} tickets criados.")
 
-    def _export_seed_json(self):
+    def _export_seed_json(self, output_path: Path):
         from accounts.serializers import UserSerializer
         from faq.serializers import FaqArticleSerializer
         from offers.serializers import OfferSerializer
@@ -398,9 +423,6 @@ class Command(BaseCommand):
             ).data,
         }
 
-        output_path = (
-            Path(settings.BASE_DIR).parent / "frontend" / "src" / "demo-data" / "seed.json"
-        )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(
             json.dumps(data, indent=2, ensure_ascii=False, default=str), encoding="utf-8"

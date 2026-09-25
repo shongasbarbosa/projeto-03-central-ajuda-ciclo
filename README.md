@@ -310,6 +310,9 @@ docker compose up --build
 O container `api` aplica as migrations, coleta os arquivos estáticos e
 executa o `seed_demo` automaticamente antes de subir o gunicorn (esse
 comportamento pode ser desativado com `SEED_DEMO_DATA=false` no `.env`).
+O comando aceita `--export-path <arquivo>` para exportar o `seed.json` em
+outro local e `--no-export` para pular a exportação por completo — é assim
+que os testes automatizados evitam sobrescrever o `seed.json` versionado.
 
 Credenciais de demonstração (também usadas pelo `seed_demo`):
 
