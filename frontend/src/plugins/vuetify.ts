@@ -18,12 +18,18 @@ const surfaceDefaults = {
   VDataTable: {
     class: "cac-surface",
   },
-  // Caixa normal (sem uppercase automático) em botões e abas.
+  // Caixa normal (sem uppercase automático) em botões e abas. O
+  // letter-spacing extra do Vuetify (pensado para texto maiúsculo) é
+  // removido via default do componente, em vez de CSS global com
+  // !important, para não competir com a especificidade das classes do
+  // próprio Vuetify.
   VBtn: {
     class: "text-none",
+    style: "letter-spacing: normal;",
   },
   VTab: {
     class: "text-none",
+    style: "letter-spacing: normal;",
   },
 };
 

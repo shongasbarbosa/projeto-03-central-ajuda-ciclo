@@ -18,12 +18,10 @@ body {
   font-family: var(--cac-font-family);
 }
 
-/* O Vuetify aplica letter-spacing extra em botões e abas pensando em texto
-   maiúsculo; como usamos caixa normal (text-none), o espaçamento também
-   deve voltar ao normal. Garante também que a Google Sans seja usada
-   nesses componentes, que às vezes definem a própria font-family. */
+/* Garante que a Google Sans seja usada em botões e abas, que às vezes
+   definem a própria font-family. O letter-spacing desses componentes é
+   normalizado via defaults do Vuetify (plugins/vuetify.ts), não aqui. */
 .v-btn,
 .v-tab {
   font-family: var(--cac-font-family) !important;
-  letter-spacing: normal !important;
 }
