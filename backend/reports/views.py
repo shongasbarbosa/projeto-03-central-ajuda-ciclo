@@ -73,6 +73,19 @@ class AvgResolutionTimeView(APIView):
         return Response(result)
 
 
+class TicketsByPriorityView(APIView):
+    permission_classes = [IsAuthenticated, IsAgent]
+
+    def get(self, request):
+        qs = Ticket.objects.all()
+        offer_id = request.query_params.get("offer")
+        if offer_id:
+            qs = qs.filter(offer_id=offer_id)
+
+        data = qs.values("priority").annotate(total=Count("id")).order_by("priority")
+        return Response(list(data))
+
+
 class ReportsSummaryView(APIView):
     permission_classes = [IsAuthenticated, IsAgent]
 

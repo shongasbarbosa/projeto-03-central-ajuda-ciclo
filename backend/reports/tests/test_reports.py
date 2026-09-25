@@ -62,3 +62,30 @@ def test_avg_resolution_time_by_category(agent, resolved_ticket):
 
     assert response.status_code == 200
     assert response.data[0]["total"] == 1
+
+
+def test_students_cannot_access_tickets_by_priority(student, resolved_ticket):
+    client = authenticated_client(student)
+
+    response = client.get("/api/reports/tickets-by-priority")
+
+    assert response.status_code == 403
+
+
+def test_tickets_by_priority(agent, resolved_ticket):
+    client = authenticated_client(agent)
+
+    response = client.get("/api/reports/tickets-by-priority")
+
+    assert response.status_code == 200
+    priorities = {row["priority"]: row["total"] for row in response.data}
+    assert priorities[resolved_ticket.priority] == 1
+
+
+def test_tickets_by_priority_filters_by_offer(agent, resolved_ticket, offer_andamento):
+    client = authenticated_client(agent)
+
+    response = client.get(f"/api/reports/tickets-by-priority?offer={offer_andamento.id}")
+
+    assert response.status_code == 200
+    assert response.data == []
