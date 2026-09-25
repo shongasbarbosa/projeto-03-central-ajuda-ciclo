@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 
 import FaqTagChips from "@/components/FaqTagChips.vue";
 import { api } from "@/services";
@@ -15,6 +15,8 @@ const editing = ref<FaqArticle | null>(null);
 const deleteDialogOpen = ref(false);
 const deleting = ref(false);
 const articleToDelete = ref<FaqArticle | null>(null);
+const cancelButtonRef = ref<{ $el: HTMLElement } | null>(null);
+let deleteTrigger: HTMLElement | null = null;
 
 const snackbar = ref(false);
 const snackbarText = ref("");
@@ -78,9 +80,18 @@ async function save() {
   }
 }
 
-function confirmDelete(article: FaqArticle) {
+async function confirmDelete(article: FaqArticle, event: MouseEvent) {
+  deleteTrigger = event.currentTarget as HTMLElement;
   articleToDelete.value = article;
   deleteDialogOpen.value = true;
+  await nextTick();
+  cancelButtonRef.value?.$el?.focus();
+}
+
+function cancelDelete() {
+  deleteDialogOpen.value = false;
+  deleteTrigger?.focus();
+  deleteTrigger = null;
 }
 
 async function remove() {
@@ -91,6 +102,7 @@ async function remove() {
     await api.faq.remove(articleToDelete.value.id);
     deleteDialogOpen.value = false;
     articleToDelete.value = null;
+    deleteTrigger = null;
     await load();
     snackbarText.value = `Artigo "${question}" excluído com sucesso.`;
     snackbar.value = true;
@@ -124,15 +136,13 @@ onMounted(load);
             <div class="d-flex align-center ga-3 text-body-2 text-medium-emphasis">
               <span class="d-flex align-center ga-1">
                 <v-icon icon="mdi-thumb-up-outline" size="16" aria-hidden="true" />
-                <span :aria-label="`${article.helpful_count} avaliações úteis`">
-                  {{ formatNumber(article.helpful_count) }}
-                </span>
+                <span aria-hidden="true">{{ formatNumber(article.helpful_count) }}</span>
+                <span class="sr-only">{{ article.helpful_count }} avaliações úteis</span>
               </span>
               <span class="d-flex align-center ga-1">
                 <v-icon icon="mdi-thumb-down-outline" size="16" aria-hidden="true" />
-                <span :aria-label="`${article.not_helpful_count} avaliações não úteis`">
-                  {{ formatNumber(article.not_helpful_count) }}
-                </span>
+                <span aria-hidden="true">{{ formatNumber(article.not_helpful_count) }}</span>
+                <span class="sr-only">{{ article.not_helpful_count }} avaliações não úteis</span>
               </span>
               <span v-if="!article.is_published">(não publicado)</span>
             </div>
@@ -148,7 +158,7 @@ onMounted(load);
               icon="mdi-delete"
               variant="text"
               aria-label="Excluir"
-              @click="confirmDelete(article)"
+              @click="(e: MouseEvent) => confirmDelete(article, e)"
             />
           </div>
         </div>
@@ -183,15 +193,21 @@ onMounted(load);
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="deleteDialogOpen" max-width="480" role="alertdialog">
+    <v-dialog
+      v-model="deleteDialogOpen"
+      max-width="480"
+      role="alertdialog"
+      aria-labelledby="delete-faq-title"
+      aria-describedby="delete-faq-description"
+    >
       <v-card class="cac-surface pa-4">
-        <v-card-title>Excluir artigo</v-card-title>
-        <v-card-text>
+        <v-card-title id="delete-faq-title">Excluir artigo</v-card-title>
+        <v-card-text id="delete-faq-description">
           Excluir o artigo "{{ articleToDelete?.question }}"? Esta ação não pode ser desfeita.
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="deleteDialogOpen = false">Cancelar</v-btn>
+          <v-btn ref="cancelButtonRef" variant="text" @click="cancelDelete">Cancelar</v-btn>
           <v-btn color="error" :loading="deleting" @click="remove">Excluir</v-btn>
         </v-card-actions>
       </v-card>

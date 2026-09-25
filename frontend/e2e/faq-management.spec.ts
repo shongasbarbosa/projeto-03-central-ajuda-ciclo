@@ -11,20 +11,25 @@ test.describe("Gestão da FAQ (modo demonstração)", () => {
 
     const firstArticle = page.locator(".v-list-item").first();
     const question = await firstArticle.locator("p").first().innerText();
+    const deleteTrigger = firstArticle.getByRole("button", { name: "Excluir" });
 
-    await firstArticle.getByRole("button", { name: "Excluir" }).click();
+    await deleteTrigger.click();
 
     const dialog = page.getByRole("alertdialog");
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(question);
     await expect(dialog).toContainText("Esta ação não pode ser desfeita");
 
-    // Cancelar não deve remover o artigo.
+    // Foco inicial vai para "Cancelar" (ação menos destrutiva por padrão).
+    await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+
+    // Cancelar não deve remover o artigo e o foco volta ao botão que abriu o diálogo.
     await dialog.getByRole("button", { name: "Cancelar" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByText(question, { exact: false }).first()).toBeVisible();
+    await expect(deleteTrigger).toBeFocused();
 
-    await firstArticle.getByRole("button", { name: "Excluir" }).click();
+    await deleteTrigger.click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
 
     await expect(page.getByText(`"${question}" excluído com sucesso`)).toBeVisible();
