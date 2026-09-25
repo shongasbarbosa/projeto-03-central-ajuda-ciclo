@@ -73,49 +73,43 @@ const phaseChartOption = computed<EChartsOption>(() => ({
   ],
 }));
 
-const priorityOrder: Array<ReportPriorityRow["priority"]> = ["baixa", "media", "alta"];
-
-const priorityChartOption = computed<EChartsOption>(() => {
-  const orderedData = priorityOrder
-    .map((priority) => priorityData.value.find((row) => row.priority === priority))
-    .filter((row): row is ReportPriorityRow => Boolean(row));
-
-  return {
-    animation: false,
-    backgroundColor: "transparent",
-    textStyle: { color: textColor.value },
-    color: paletteBySeries,
-    tooltip: {
-      trigger: "axis",
-      valueFormatter: (value) => formatNumber(Number(value)),
-    },
-    grid: { left: 48, right: 16, top: 24, bottom: 32 },
-    xAxis: {
-      type: "category",
-      data: orderedData.map((row) => PRIORITY_LABELS[row.priority]),
-      axisLabel: { color: textColor.value },
-      axisLine: { lineStyle: { color: textColor.value } },
-    },
-    yAxis: {
-      type: "value",
-      axisLabel: { color: textColor.value, formatter: formatAxisNumber },
-      splitLine: { lineStyle: { color: splitLineColor.value } },
-    },
-    series: [
-      {
-        name: "Chamados",
-        type: "bar",
-        data: orderedData.map((row) => row.total),
-        label: {
-          show: true,
-          position: "top",
-          color: textColor.value,
-          formatter: (params) => formatNumber(Number(params.value)),
-        },
+// A API (real e demo) já garante as três prioridades, sempre na ordem
+// baixa/média/alta — nenhuma reordenação é feita aqui.
+const priorityChartOption = computed<EChartsOption>(() => ({
+  animation: false,
+  backgroundColor: "transparent",
+  textStyle: { color: textColor.value },
+  color: paletteBySeries,
+  tooltip: {
+    trigger: "axis",
+    valueFormatter: (value) => formatNumber(Number(value)),
+  },
+  grid: { left: 48, right: 16, top: 24, bottom: 32 },
+  xAxis: {
+    type: "category",
+    data: priorityData.value.map((row) => PRIORITY_LABELS[row.priority]),
+    axisLabel: { color: textColor.value },
+    axisLine: { lineStyle: { color: textColor.value } },
+  },
+  yAxis: {
+    type: "value",
+    axisLabel: { color: textColor.value, formatter: formatAxisNumber },
+    splitLine: { lineStyle: { color: splitLineColor.value } },
+  },
+  series: [
+    {
+      name: "Chamados",
+      type: "bar",
+      data: priorityData.value.map((row) => row.total),
+      label: {
+        show: true,
+        position: "top",
+        color: textColor.value,
+        formatter: (params) => formatNumber(Number(params.value)),
       },
-    ],
-  };
-});
+    },
+  ],
+}));
 
 const categoryChartOption = computed<EChartsOption>(() => ({
   animation: false,
@@ -192,9 +186,7 @@ const phaseSummaryText = computed(() =>
 );
 
 const prioritySummaryText = computed(() =>
-  priorityOrder
-    .map((priority) => priorityData.value.find((row) => row.priority === priority))
-    .filter((row): row is ReportPriorityRow => Boolean(row))
+  priorityData.value
     .map((row) => `${PRIORITY_LABELS[row.priority]}: ${formatNumber(row.total)} chamados`)
     .join(". ")
 );
