@@ -13,6 +13,7 @@ from config.settings.base import env
 from faq.models import FaqArticle
 from offers.cycle_phase import ANDAMENTO, ENCERRAMENTO, MATRICULA
 from offers.models import Offer
+from tickets.code import generate_ticket_code
 from tickets.models import Ticket, TicketMessage
 
 RNG_SEED = 42
@@ -336,6 +337,9 @@ class Command(BaseCommand):
 
             age_days = random.randint(1, 150)
             created_at = now - timedelta(days=age_days, hours=random.randint(0, 23))
+            code, code_year, code_month, code_sequence = generate_ticket_code(
+                reference_dt=created_at
+            )
 
             ticket = Ticket.objects.create(
                 author=author,
@@ -346,6 +350,10 @@ class Command(BaseCommand):
                 subject=subject,
                 description=TICKET_DESCRIPTION.format(subject=subject),
                 cycle_phase_at_opening=phase,
+                code=code,
+                code_year=code_year,
+                code_month=code_month,
+                code_sequence=code_sequence,
             )
 
             first_response_at = None
