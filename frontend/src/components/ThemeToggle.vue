@@ -16,7 +16,13 @@ const options: Array<{ value: ThemeMode; label: string; icon: string }> = [
 
 <template>
   <div class="d-flex" role="group" aria-label="Selecionar tema da interface">
-    <v-tooltip v-for="option in options" :key="option.value" :text="option.label" location="bottom">
+    <v-tooltip
+      v-for="option in options"
+      :key="option.value"
+      :text="option.label"
+      location="bottom"
+      :transition="false"
+    >
       <template #activator="{ props: tooltipProps }">
         <v-btn
           v-bind="tooltipProps"

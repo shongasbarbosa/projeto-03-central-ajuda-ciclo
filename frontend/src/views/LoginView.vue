@@ -78,7 +78,7 @@ function handleSubmit() {
           </v-btn>
           <v-btn
             variant="tonal"
-            color="secondary"
+            color="primary"
             block
             :loading="loading"
             @click="submit('atendente.demo', '')"
