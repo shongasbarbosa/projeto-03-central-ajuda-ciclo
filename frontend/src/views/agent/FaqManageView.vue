@@ -12,6 +12,13 @@ const dialogOpen = ref(false);
 const saving = ref(false);
 const editing = ref<FaqArticle | null>(null);
 
+const deleteDialogOpen = ref(false);
+const deleting = ref(false);
+const articleToDelete = ref<FaqArticle | null>(null);
+
+const snackbar = ref(false);
+const snackbarText = ref("");
+
 const form = ref({
   question: "",
   answer: "",
@@ -71,9 +78,25 @@ async function save() {
   }
 }
 
-async function remove(article: FaqArticle) {
-  await api.faq.remove(article.id);
-  await load();
+function confirmDelete(article: FaqArticle) {
+  articleToDelete.value = article;
+  deleteDialogOpen.value = true;
+}
+
+async function remove() {
+  if (!articleToDelete.value) return;
+  deleting.value = true;
+  try {
+    const question = articleToDelete.value.question;
+    await api.faq.remove(articleToDelete.value.id);
+    deleteDialogOpen.value = false;
+    articleToDelete.value = null;
+    await load();
+    snackbarText.value = `Artigo "${question}" excluído com sucesso.`;
+    snackbar.value = true;
+  } finally {
+    deleting.value = false;
+  }
 }
 
 onMounted(load);
@@ -89,20 +112,46 @@ onMounted(load);
     <v-progress-linear v-if="loading" indeterminate />
 
     <v-list v-else class="cac-surface">
-      <v-list-item v-for="article in articles" :key="article.id" class="py-2">
-        <v-list-item-title>{{ article.question }}</v-list-item-title>
-        <v-list-item-subtitle class="mt-1">
-          <FaqTagChips :category="article.category" :cycle-phase="article.cycle_phase" />
-          <div class="mt-1">
-            👍 {{ formatNumber(article.helpful_count) }} · 👎
-            {{ formatNumber(article.not_helpful_count) }}
-            <span v-if="!article.is_published"> · (não publicado)</span>
+      <v-list-item v-for="article in articles" :key="article.id" class="py-3">
+        <div class="d-flex justify-space-between align-start ga-2 flex-wrap">
+          <div>
+            <p class="text-body-1 font-weight-500 mb-2">{{ article.question }}</p>
+            <FaqTagChips
+              class="mb-2"
+              :category="article.category"
+              :cycle-phase="article.cycle_phase"
+            />
+            <div class="d-flex align-center ga-3 text-body-2 text-medium-emphasis">
+              <span class="d-flex align-center ga-1">
+                <v-icon icon="mdi-thumb-up-outline" size="16" aria-hidden="true" />
+                <span :aria-label="`${article.helpful_count} avaliações úteis`">
+                  {{ formatNumber(article.helpful_count) }}
+                </span>
+              </span>
+              <span class="d-flex align-center ga-1">
+                <v-icon icon="mdi-thumb-down-outline" size="16" aria-hidden="true" />
+                <span :aria-label="`${article.not_helpful_count} avaliações não úteis`">
+                  {{ formatNumber(article.not_helpful_count) }}
+                </span>
+              </span>
+              <span v-if="!article.is_published">(não publicado)</span>
+            </div>
           </div>
-        </v-list-item-subtitle>
-        <template #append>
-          <v-btn icon="mdi-pencil" variant="text" aria-label="Editar" @click="openEdit(article)" />
-          <v-btn icon="mdi-delete" variant="text" aria-label="Excluir" @click="remove(article)" />
-        </template>
+          <div class="d-flex">
+            <v-btn
+              icon="mdi-pencil"
+              variant="text"
+              aria-label="Editar"
+              @click="openEdit(article)"
+            />
+            <v-btn
+              icon="mdi-delete"
+              variant="text"
+              aria-label="Excluir"
+              @click="confirmDelete(article)"
+            />
+          </div>
+        </div>
       </v-list-item>
     </v-list>
 
@@ -133,5 +182,21 @@ onMounted(load);
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="deleteDialogOpen" max-width="480" role="alertdialog">
+      <v-card class="cac-surface pa-4">
+        <v-card-title>Excluir artigo</v-card-title>
+        <v-card-text>
+          Excluir o artigo "{{ articleToDelete?.question }}"? Esta ação não pode ser desfeita.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="deleteDialogOpen = false">Cancelar</v-btn>
+          <v-btn color="error" :loading="deleting" @click="remove">Excluir</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-snackbar v-model="snackbar" timeout="4000">{{ snackbarText }}</v-snackbar>
   </div>
 </template>
