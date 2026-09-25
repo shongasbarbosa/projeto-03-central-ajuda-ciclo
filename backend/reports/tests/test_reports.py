@@ -72,14 +72,27 @@ def test_students_cannot_access_tickets_by_priority(student, resolved_ticket):
     assert response.status_code == 403
 
 
-def test_tickets_by_priority(agent, resolved_ticket):
+def test_tickets_by_priority_always_returns_all_three_in_order(agent, resolved_ticket):
+    client = authenticated_client(agent)
+
+    response = client.get("/api/reports/tickets-by-priority")
+
+    assert response.status_code == 200
+    assert [row["priority"] for row in response.data] == ["baixa", "media", "alta"]
+    priorities = {row["priority"]: row["total"] for row in response.data}
+    assert priorities[resolved_ticket.priority] == 1
+
+
+def test_tickets_by_priority_returns_zero_for_priorities_without_tickets(agent, resolved_ticket):
     client = authenticated_client(agent)
 
     response = client.get("/api/reports/tickets-by-priority")
 
     assert response.status_code == 200
     priorities = {row["priority"]: row["total"] for row in response.data}
-    assert priorities[resolved_ticket.priority] == 1
+    for priority, total in priorities.items():
+        if priority != resolved_ticket.priority:
+            assert total == 0
 
 
 def test_tickets_by_priority_filters_by_offer(agent, resolved_ticket, offer_andamento):
@@ -88,4 +101,5 @@ def test_tickets_by_priority_filters_by_offer(agent, resolved_ticket, offer_anda
     response = client.get(f"/api/reports/tickets-by-priority?offer={offer_andamento.id}")
 
     assert response.status_code == 200
-    assert response.data == []
+    assert [row["priority"] for row in response.data] == ["baixa", "media", "alta"]
+    assert all(row["total"] == 0 for row in response.data)
