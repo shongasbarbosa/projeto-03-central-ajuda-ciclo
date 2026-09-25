@@ -62,13 +62,32 @@ export function resetDemoState() {
   Object.assign(demoState, buildInitialState());
 }
 
-/** Gera o próximo código de chamado para o mês atual (hora local do
- * navegador), reiniciando o sequencial a cada mês — mesma regra do
- * backend (ver backend/tickets/code.py), sem a conversão de fuso horário
- * do servidor, que não se aplica ao modo demonstração. */
+const CODE_TIME_ZONE = "America/Sao_Paulo";
+
+// Reaproveita um único formatter (Intl.DateTimeFormat é relativamente caro
+// de instanciar) para ler ano e mês no fuso America/Sao_Paulo, igual ao
+// backend (timezone.localtime() com TIME_ZONE=America/Sao_Paulo — ver
+// backend/tickets/code.py), em vez do fuso local do navegador. Sem isso, um
+// chamado aberto perto da virada do mês receberia um código diferente do
+// que a API real geraria para o mesmo instante.
+const codeDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: CODE_TIME_ZONE,
+  year: "numeric",
+  month: "numeric",
+});
+
+function yearMonthInCodeTimeZone(referenceDate: Date): { year: number; month: number } {
+  const parts = codeDateFormatter.formatToParts(referenceDate);
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  return { year, month };
+}
+
+/** Gera o próximo código de chamado para o mês de `referenceDate`, no fuso
+ * America/Sao_Paulo, reiniciando o sequencial a cada mês — mesma regra do
+ * backend (ver backend/tickets/code.py). */
 export function generateDemoTicketCode(referenceDate: Date = new Date()): string {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth() + 1;
+  const { year, month } = yearMonthInCodeTimeZone(referenceDate);
   const key = `${year}-${String(month).padStart(2, "0")}`;
   const nextSequence = (demoState.codeCounters[key] ?? 0) + 1;
   demoState.codeCounters[key] = nextSequence;
