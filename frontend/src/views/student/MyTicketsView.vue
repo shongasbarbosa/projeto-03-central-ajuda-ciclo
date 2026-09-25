@@ -1,51 +1,32 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, onMounted, ref } from "vue";
 
 import TicketStatusChip from "@/components/TicketStatusChip.vue";
+import { useListFilters, type FilterField } from "@/composables/useListFilters";
 import { api } from "@/services";
 import type { TicketListItem, TicketStatus } from "@/services/types";
 import { CATEGORY_LABELS, STATUS_LABELS, formatDateTime } from "@/utils/labels";
-import { buildQuery, readQueryEnum, readQueryParam } from "@/utils/queryFilters";
 import { parseCodeQuery } from "@/utils/ticketCode";
-
-const route = useRoute();
-const router = useRouter();
 
 const STATUSES = Object.keys(STATUS_LABELS) as TicketStatus[];
 const statusItems = Object.entries(STATUS_LABELS).map(([value, title]) => ({ value, title }));
 
 const tickets = ref<TicketListItem[]>([]);
 const loading = ref(true);
-const search = ref("");
-const status = ref<TicketStatus | null>(null);
 
-let restoringFromUrl = false;
+const FIELDS: FilterField[] = [
+  { key: "search", param: "q", type: "text" },
+  { key: "status", param: "status", type: "enum", allowed: STATUSES },
+];
 
-function restoreFromRoute() {
-  restoringFromUrl = true;
-  const query = route.query as Record<string, unknown>;
-  search.value = readQueryParam(query, "q") ?? "";
-  status.value = readQueryEnum(query, "status", STATUSES) ?? null;
-  nextTick(() => {
-    restoringFromUrl = false;
-  });
-}
-
-const activeFilterCount = computed(() => {
-  let count = 0;
-  if (search.value) count += 1;
-  if (status.value) count += 1;
-  return count;
+const { filters, activeFilterCount, clearFilters, init } = useListFilters({
+  listKey: "student-my-tickets",
+  fields: FIELDS,
+  load,
 });
 
-function clearFilters() {
-  search.value = "";
-  status.value = null;
-}
-
 const exactMatch = computed(() => {
-  const codeQuery = parseCodeQuery(search.value);
+  const codeQuery = parseCodeQuery(filters.search);
   if (!codeQuery || codeQuery.month === undefined || codeQuery.year === undefined) return null;
   if (tickets.value.length !== 1) return null;
   return tickets.value[0];
@@ -55,34 +36,15 @@ async function load() {
   loading.value = true;
   try {
     tickets.value = await api.tickets.list({
-      search: search.value || undefined,
-      status: status.value ?? undefined,
+      search: filters.search || undefined,
+      status: filters.status ?? undefined,
     });
   } finally {
     loading.value = false;
   }
 }
 
-function syncRoute() {
-  if (restoringFromUrl) return;
-  router.replace({
-    query: buildQuery({ q: search.value, status: status.value ?? undefined }),
-  });
-}
-
-let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-watch([search, status], () => {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    syncRoute();
-    load();
-  }, 250);
-});
-
-onMounted(() => {
-  restoreFromRoute();
-  load();
-});
+onMounted(init);
 </script>
 
 <template>
@@ -97,7 +59,7 @@ onMounted(() => {
     <v-row dense class="mb-2">
       <v-col cols="12" sm="8" md="6">
         <v-text-field
-          v-model="search"
+          v-model="filters.search"
           label="Buscar por assunto, descrição ou código"
           prepend-inner-icon="mdi-magnify"
           density="compact"
@@ -106,7 +68,7 @@ onMounted(() => {
       </v-col>
       <v-col cols="12" sm="4" md="3">
         <v-select
-          v-model="status"
+          v-model="filters.status"
           :items="statusItems"
           label="Status"
           density="compact"

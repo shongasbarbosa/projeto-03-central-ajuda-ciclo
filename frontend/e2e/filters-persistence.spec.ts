@@ -39,6 +39,34 @@ test.describe("Persistência de filtros na fila do atendente (modo demonstraçã
     await expect(page.getByLabel("Status", { exact: true })).toHaveValue("");
   });
 
+  test("filtros sobrevivem a navegar para outra aba do menu e voltar", async ({ page }) => {
+    await page.goto("/#/login");
+    await page.getByRole("button", { name: "Entrar como atendente" }).click();
+    await page.waitForURL(/#\/atendente\/fila$/);
+
+    await page.getByLabel("Status", { exact: true }).click({ force: true });
+    await page.getByRole("option", { name: "Resolvido" }).click();
+    await page.waitForURL(/status=resolvido/);
+
+    // Vai para a FAQ pelo menu (não pelo botão "voltar" do navegador) e
+    // volta para a fila pelo menu de novo: a query deve ser restaurada,
+    // não zerada, porque o requisito é só limpar filtros explicitamente.
+    await page.getByRole("tab", { name: "FAQ" }).click();
+    await expect(page).toHaveURL(/#\/atendente\/faq$/);
+
+    await page.getByRole("tab", { name: "Fila de chamados" }).click();
+    await expect(page).toHaveURL(/#\/atendente\/fila\?.*status=resolvido/);
+    await expect(page.getByLabel("Status", { exact: true })).toHaveValue("Resolvido");
+
+    await page.getByRole("button", { name: "Limpar filtros" }).click();
+    await expect(page).not.toHaveURL(/status=/);
+
+    // Depois de limpar, navegar de novo não deve trazer o filtro de volta.
+    await page.getByRole("tab", { name: "FAQ" }).click();
+    await page.getByRole("tab", { name: "Fila de chamados" }).click();
+    await expect(page).not.toHaveURL(/status=/);
+  });
+
   test("o X do campo de busca limpa só a busca", async ({ page }) => {
     await page.goto("/#/login");
     await page.getByRole("button", { name: "Entrar como atendente" }).click();

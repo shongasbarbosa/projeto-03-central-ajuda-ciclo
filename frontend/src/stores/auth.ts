@@ -5,6 +5,7 @@ import { api, isDemoMode } from "@/services";
 import { getAccessToken, setTokens } from "@/services/api/http";
 import { resetDemoState } from "@/services/demo/store";
 import type { User } from "@/services/types";
+import { useListFiltersStore } from "@/stores/listFilters";
 
 const DEMO_SESSION_KEY = "cac-demo-username";
 
@@ -50,6 +51,7 @@ export const useAuthStore = defineStore("auth", () => {
     await api.auth.logout();
     user.value = null;
     setTokens(null, null);
+    useListFiltersStore().clearAll();
     if (isDemoMode) {
       resetDemoState();
       try {

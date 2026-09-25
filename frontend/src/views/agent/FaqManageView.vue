@@ -1,23 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { nextTick, onMounted, ref } from "vue";
 
 import FaqTagChips from "@/components/FaqTagChips.vue";
+import { useListFilters, type FilterField } from "@/composables/useListFilters";
 import { api } from "@/services";
 import type { CyclePhase, FaqArticle, TicketCategory } from "@/services/types";
 import { CATEGORY_LABELS, CYCLE_PHASE_LABELS, formatNumber } from "@/utils/labels";
-import { buildQuery, readQueryEnum, readQueryParam } from "@/utils/queryFilters";
-
-const route = useRoute();
-const router = useRouter();
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as TicketCategory[];
 const PHASES = Object.keys(CYCLE_PHASE_LABELS) as CyclePhase[];
 
 const articles = ref<FaqArticle[]>([]);
-const search = ref("");
-const category = ref<TicketCategory | null>(null);
-const cyclePhase = ref<CyclePhase | null>(null);
 const loading = ref(true);
 const dialogOpen = ref(false);
 const saving = ref(false);
@@ -43,65 +36,31 @@ const form = ref({
 const categoryItems = Object.entries(CATEGORY_LABELS).map(([value, title]) => ({ value, title }));
 const phaseItems = Object.entries(CYCLE_PHASE_LABELS).map(([value, title]) => ({ value, title }));
 
-let restoringFromUrl = false;
+const FIELDS: FilterField[] = [
+  { key: "search", param: "q", type: "text" },
+  { key: "category", param: "category", type: "enum", allowed: CATEGORIES },
+  { key: "cyclePhase", param: "phase", type: "enum", allowed: PHASES },
+];
 
-function restoreFromRoute() {
-  restoringFromUrl = true;
-  const query = route.query as Record<string, unknown>;
-  search.value = readQueryParam(query, "q") ?? "";
-  category.value = readQueryEnum(query, "category", CATEGORIES) ?? null;
-  cyclePhase.value = readQueryEnum(query, "phase", PHASES) ?? null;
-  nextTick(() => {
-    restoringFromUrl = false;
-  });
-}
-
-const activeFilterCount = computed(() => {
-  let count = 0;
-  if (search.value) count += 1;
-  if (category.value) count += 1;
-  if (cyclePhase.value) count += 1;
-  return count;
+const { filters, activeFilterCount, clearFilters, init } = useListFilters({
+  listKey: "agent-faq-manage",
+  fields: FIELDS,
+  load,
+  debounceMs: 300,
 });
-
-function clearFilters() {
-  search.value = "";
-  category.value = null;
-  cyclePhase.value = null;
-}
-
-function syncRoute() {
-  if (restoringFromUrl) return;
-  router.replace({
-    query: buildQuery({
-      q: search.value,
-      category: category.value ?? undefined,
-      phase: cyclePhase.value ?? undefined,
-    }),
-  });
-}
 
 async function load() {
   loading.value = true;
   try {
     articles.value = await api.faq.list({
-      search: search.value || undefined,
-      category: category.value ?? undefined,
-      cycle_phase: cyclePhase.value ?? undefined,
+      search: filters.search || undefined,
+      category: filters.category ?? undefined,
+      cycle_phase: filters.cyclePhase ?? undefined,
     });
   } finally {
     loading.value = false;
   }
 }
-
-let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-watch([search, category, cyclePhase], () => {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    syncRoute();
-    load();
-  }, 300);
-});
 
 function openCreate() {
   editing.value = null;
@@ -173,10 +132,7 @@ async function remove() {
   }
 }
 
-onMounted(() => {
-  restoreFromRoute();
-  load();
-});
+onMounted(init);
 </script>
 
 <template>
@@ -189,7 +145,7 @@ onMounted(() => {
     <v-row dense class="mb-2">
       <v-col cols="12" sm="6" md="5">
         <v-text-field
-          v-model="search"
+          v-model="filters.search"
           label="Buscar por pergunta ou resposta"
           prepend-inner-icon="mdi-magnify"
           density="compact"
@@ -198,7 +154,7 @@ onMounted(() => {
       </v-col>
       <v-col cols="6" sm="3" md="3">
         <v-select
-          v-model="category"
+          v-model="filters.category"
           :items="categoryItems"
           label="Categoria"
           density="compact"
@@ -207,7 +163,7 @@ onMounted(() => {
       </v-col>
       <v-col cols="6" sm="3" md="3">
         <v-select
-          v-model="cyclePhase"
+          v-model="filters.cyclePhase"
           :items="phaseItems"
           label="Fase do ciclo"
           density="compact"

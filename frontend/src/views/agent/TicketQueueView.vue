@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
 import TicketStatusChip from "@/components/TicketStatusChip.vue";
+import { useListFilters, type FilterField } from "@/composables/useListFilters";
 import { api } from "@/services";
 import type { TicketCategory, TicketListItem, TicketPriority, TicketStatus } from "@/services/types";
 import {
@@ -12,10 +13,8 @@ import {
   STATUS_LABELS,
   formatDateTime,
 } from "@/utils/labels";
-import { buildQuery, readQueryEnum, readQueryParam, readQueryPositiveInt } from "@/utils/queryFilters";
 import { parseCodeQuery, ticketCodeSortKey } from "@/utils/ticketCode";
 
-const route = useRoute();
 const router = useRouter();
 
 const STATUSES = Object.keys(STATUS_LABELS) as TicketStatus[];
@@ -26,60 +25,22 @@ const PHASES = Object.keys(CYCLE_PHASE_LABELS);
 const tickets = ref<TicketListItem[]>([]);
 const loading = ref(true);
 
-const search = ref("");
-const status = ref<TicketStatus | null>(null);
-const category = ref<TicketCategory | null>(null);
-const priority = ref<TicketPriority | null>(null);
-const cyclePhase = ref<string | null>(null);
-const page = ref(1);
-const itemsPerPage = ref(10);
-const sortBy = ref<{ key: string; order: "asc" | "desc" }[]>([]);
+const FIELDS: FilterField[] = [
+  { key: "search", param: "q", type: "text" },
+  { key: "status", param: "status", type: "enum", allowed: STATUSES },
+  { key: "category", param: "category", type: "enum", allowed: CATEGORIES },
+  { key: "priority", param: "priority", type: "enum", allowed: PRIORITIES },
+  { key: "cyclePhase", param: "phase", type: "enum", allowed: PHASES },
+  { key: "page", param: "page", type: "page", default: 1 },
+  { key: "itemsPerPage", param: "perPage", type: "page", default: 10 },
+  { key: "sortBy", param: "sort", type: "sort" },
+];
 
-let restoringFromUrl = false;
-
-function restoreFromRoute() {
-  restoringFromUrl = true;
-  const query = route.query as Record<string, unknown>;
-  search.value = readQueryParam(query, "q") ?? "";
-  status.value = readQueryEnum(query, "status", STATUSES) ?? null;
-  category.value = readQueryEnum(query, "category", CATEGORIES) ?? null;
-  priority.value = readQueryEnum(query, "priority", PRIORITIES) ?? null;
-  cyclePhase.value = readQueryEnum(query, "phase", PHASES) ?? null;
-  page.value = readQueryPositiveInt(query, "page", 1);
-  itemsPerPage.value = readQueryPositiveInt(query, "perPage", 10);
-
-  const sortRaw = readQueryParam(query, "sort");
-  if (sortRaw) {
-    const [key, order] = sortRaw.split(":");
-    sortBy.value = key ? [{ key, order: order === "desc" ? "desc" : "asc" }] : [];
-  } else {
-    sortBy.value = [];
-  }
-  // O reset acontece só depois que os watchers reativos (assíncronos) já
-  // rodaram, senão a flag voltaria a false antes de eles verem o valor.
-  nextTick(() => {
-    restoringFromUrl = false;
-  });
-}
-
-const activeFilterCount = computed(() => {
-  let count = 0;
-  if (search.value) count += 1;
-  if (status.value) count += 1;
-  if (category.value) count += 1;
-  if (priority.value) count += 1;
-  if (cyclePhase.value) count += 1;
-  return count;
+const { filters, activeFilterCount, clearFilters, init } = useListFilters({
+  listKey: "agent-queue",
+  fields: FIELDS,
+  load,
 });
-
-function clearFilters() {
-  search.value = "";
-  status.value = null;
-  category.value = null;
-  priority.value = null;
-  cyclePhase.value = null;
-  page.value = 1;
-}
 
 const statusItems = Object.entries(STATUS_LABELS).map(([value, title]) => ({ value, title }));
 const categoryItems = Object.entries(CATEGORY_LABELS).map(([value, title]) => ({ value, title }));
@@ -103,7 +64,7 @@ const rows = computed(() =>
 // Quando a busca corresponde exatamente a um único código, destaca o
 // chamado em vez de deixá-lo perdido no meio da tabela.
 const exactMatch = computed(() => {
-  const codeQuery = parseCodeQuery(search.value);
+  const codeQuery = parseCodeQuery(filters.search);
   if (!codeQuery || codeQuery.month === undefined || codeQuery.year === undefined) return null;
   if (tickets.value.length !== 1) return null;
   return tickets.value[0];
@@ -113,57 +74,22 @@ async function load() {
   loading.value = true;
   try {
     tickets.value = await api.tickets.list({
-      search: search.value || undefined,
-      status: status.value ?? undefined,
-      category: category.value ?? undefined,
-      priority: priority.value ?? undefined,
-      cycle_phase: (cyclePhase.value as never) ?? undefined,
+      search: filters.search || undefined,
+      status: filters.status ?? undefined,
+      category: filters.category ?? undefined,
+      priority: filters.priority ?? undefined,
+      cycle_phase: filters.cyclePhase ?? undefined,
     });
   } finally {
     loading.value = false;
   }
 }
 
-function syncRoute() {
-  if (restoringFromUrl) return;
-  const sortParam = sortBy.value[0] ? `${sortBy.value[0].key}:${sortBy.value[0].order}` : undefined;
-  router.replace({
-    query: buildQuery({
-      q: search.value,
-      status: status.value ?? undefined,
-      category: category.value ?? undefined,
-      priority: priority.value ?? undefined,
-      phase: cyclePhase.value ?? undefined,
-      page: page.value !== 1 ? page.value : undefined,
-      perPage: itemsPerPage.value !== 10 ? itemsPerPage.value : undefined,
-      sort: sortParam,
-    }),
-  });
-}
-
-let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-watch([search, status, category, priority, cyclePhase], () => {
-  if (!restoringFromUrl) page.value = 1;
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    syncRoute();
-    load();
-  }, 250);
-});
-
-watch([page, itemsPerPage, sortBy], () => {
-  if (restoringFromUrl) return;
-  syncRoute();
-});
-
 function handleRowClick(_event: unknown, row: { item: TicketListItem }) {
   router.push({ name: "ticket-detail", params: { id: row.item.id } });
 }
 
-onMounted(() => {
-  restoreFromRoute();
-  load();
-});
+onMounted(init);
 </script>
 
 <template>
@@ -178,7 +104,7 @@ onMounted(() => {
     <v-row class="mb-2" dense>
       <v-col cols="12" md="4">
         <v-text-field
-          v-model="search"
+          v-model="filters.search"
           label="Buscar (assunto, descrição ou código)"
           prepend-inner-icon="mdi-magnify"
           density="compact"
@@ -186,11 +112,17 @@ onMounted(() => {
         />
       </v-col>
       <v-col cols="6" md="2">
-        <v-select v-model="status" :items="statusItems" label="Status" density="compact" clearable />
+        <v-select
+          v-model="filters.status"
+          :items="statusItems"
+          label="Status"
+          density="compact"
+          clearable
+        />
       </v-col>
       <v-col cols="6" md="2">
         <v-select
-          v-model="category"
+          v-model="filters.category"
           :items="categoryItems"
           label="Categoria"
           density="compact"
@@ -199,7 +131,7 @@ onMounted(() => {
       </v-col>
       <v-col cols="6" md="2">
         <v-select
-          v-model="priority"
+          v-model="filters.priority"
           :items="priorityItems"
           label="Prioridade"
           density="compact"
@@ -208,7 +140,7 @@ onMounted(() => {
       </v-col>
       <v-col cols="6" md="2">
         <v-select
-          v-model="cyclePhase"
+          v-model="filters.cyclePhase"
           :items="phaseItems"
           label="Fase do ciclo"
           density="compact"
@@ -237,9 +169,9 @@ onMounted(() => {
     </v-alert>
 
     <v-data-table
-      v-model:page="page"
-      v-model:items-per-page="itemsPerPage"
-      v-model:sort-by="sortBy"
+      v-model:page="filters.page"
+      v-model:items-per-page="filters.itemsPerPage"
+      v-model:sort-by="filters.sortBy"
       :headers="headers"
       :items="rows"
       :loading="loading"
