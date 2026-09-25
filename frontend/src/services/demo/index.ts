@@ -1,3 +1,5 @@
+import { parseCodeQuery } from "@/utils/ticketCode";
+
 import { ApiError } from "../api/http";
 import type {
   ApiService,
@@ -7,10 +9,11 @@ import type {
   TicketFilters,
   TicketListItem,
   TicketMessage,
+  TicketPriority,
   User,
 } from "../types";
 import { canTransitionTo } from "../types";
-import { demoState } from "./store";
+import { demoState, generateDemoTicketCode } from "./store";
 
 function requireUser(): User {
   if (!demoState.currentUser) {
@@ -97,11 +100,7 @@ export const demoApi: ApiService = {
         list = list.filter((t) => t.assigned_to?.id === filters.assigned_to);
       }
       if (filters.search) {
-        const term = filters.search.toLowerCase();
-        list = list.filter(
-          (t) =>
-            t.subject.toLowerCase().includes(term) || t.description.toLowerCase().includes(term)
-        );
+        list = applyTicketSearch(list, filters.search);
       }
 
       return [...list].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).map(toListItem);
@@ -123,6 +122,7 @@ export const demoApi: ApiService = {
       const now = new Date().toISOString();
       const ticket: TicketDetail = {
         id: demoState.nextTicketId++,
+        code: generateDemoTicketCode(),
         author: user,
         offer: offer.id,
         offer_name: offer.name,
@@ -296,14 +296,13 @@ export const demoApi: ApiService = {
       let tickets = demoState.tickets;
       if (offer) tickets = tickets.filter((t) => t.offer === offer);
 
-      const byPriority = new Map<string, number>();
+      const totals = new Map<string, number>();
       for (const ticket of tickets) {
-        byPriority.set(ticket.priority, (byPriority.get(ticket.priority) ?? 0) + 1);
+        totals.set(ticket.priority, (totals.get(ticket.priority) ?? 0) + 1);
       }
 
-      return Array.from(byPriority.entries())
-        .map(([priority, total]) => ({ priority: priority as TicketDetail["priority"], total }))
-        .sort((a, b) => a.priority.localeCompare(b.priority));
+      const order: TicketPriority[] = ["baixa", "media", "alta"];
+      return order.map((priority) => ({ priority, total: totals.get(priority) ?? 0 }));
     },
 
     async avgResolutionTime(category, offer) {
@@ -349,9 +348,31 @@ export const demoApi: ApiService = {
   },
 };
 
+function applyTicketSearch(list: TicketDetail[], search: string): TicketDetail[] {
+  const codeQuery = parseCodeQuery(search);
+  if (!codeQuery) {
+    const term = search.toLowerCase();
+    return list.filter(
+      (t) =>
+        t.subject.toLowerCase().includes(term) || t.description.toLowerCase().includes(term)
+    );
+  }
+
+  return list.filter((t) => {
+    const match = /^(\d{5})-(\d{2})-(\d{4})$/.exec(t.code);
+    if (!match) return false;
+    const [, sequenceText, monthText, yearText] = match;
+    if (Number(sequenceText) !== codeQuery.sequence) return false;
+    if (codeQuery.month !== undefined && Number(monthText) !== codeQuery.month) return false;
+    if (codeQuery.year !== undefined && Number(yearText) !== codeQuery.year) return false;
+    return true;
+  });
+}
+
 function toListItem(ticket: TicketDetail): TicketListItem {
   return {
     id: ticket.id,
+    code: ticket.code,
     author: ticket.author,
     offer: ticket.offer,
     offer_name: ticket.offer_name,

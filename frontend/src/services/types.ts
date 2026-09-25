@@ -46,6 +46,7 @@ export interface TicketMessage {
 
 export interface TicketListItem {
   id: number;
+  code: string;
   author: User;
   offer: number;
   offer_name: string;

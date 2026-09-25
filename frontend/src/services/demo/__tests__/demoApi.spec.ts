@@ -104,6 +104,64 @@ describe("demoApi.tickets permissões", () => {
   });
 });
 
+describe("demoApi.tickets código de protocolo", () => {
+  it("gera um código no formato NNNNN-MM-AAAA ao criar um chamado", async () => {
+    await demoApi.auth.login("aluno.demo", "");
+    const offer = demoState.offers[0];
+
+    const ticket = await demoApi.tickets.create({
+      offer: offer.id,
+      category: "acesso",
+      priority: "media",
+      subject: "Teste de código",
+      description: "Descrição.",
+    });
+
+    expect(ticket.code).toMatch(/^\d{5}-\d{2}-\d{4}$/);
+  });
+
+  it("incrementa o sequencial a cada novo chamado no mesmo mês", async () => {
+    await demoApi.auth.login("aluno.demo", "");
+    const offer = demoState.offers[0];
+    const create = () =>
+      demoApi.tickets.create({
+        offer: offer.id,
+        category: "acesso",
+        priority: "media",
+        subject: "Teste",
+        description: "Descrição.",
+      });
+
+    const first = await create();
+    const second = await create();
+
+    const firstSequence = Number(first.code.slice(0, 5));
+    const secondSequence = Number(second.code.slice(0, 5));
+    expect(secondSequence).toBe(firstSequence + 1);
+  });
+
+  it("busca por código completo encontra o chamado exato", async () => {
+    await demoApi.auth.login("atendente.demo", "");
+    const target = demoState.tickets[0];
+
+    const results = await demoApi.tickets.list({ search: target.code });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].code).toBe(target.code);
+  });
+
+  it("busca só pelo número lista chamados de todos os meses", async () => {
+    await demoApi.auth.login("atendente.demo", "");
+    const target = demoState.tickets[0];
+    const sequence = target.code.slice(0, 5).replace(/^0+/, "");
+
+    const results = await demoApi.tickets.list({ search: sequence });
+
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results.every((t) => t.code.startsWith(target.code.slice(0, 5)))).toBe(true);
+  });
+});
+
 describe("demoApi.reports", () => {
   it("agrupa chamados por prioridade", async () => {
     await demoApi.auth.login("atendente.demo", "");

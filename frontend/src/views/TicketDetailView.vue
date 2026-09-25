@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import TicketStatusChip from "@/components/TicketStatusChip.vue";
 import { api } from "@/services";
@@ -16,10 +17,14 @@ import {
 
 const props = defineProps<{ id: number }>();
 const auth = useAuthStore();
+const route = useRoute();
+const router = useRouter();
 
 const ticket = ref<TicketDetail | null>(null);
 const loading = ref(true);
 const notFoundOrForbidden = ref(false);
+const snackbar = ref(false);
+const snackbarText = ref("");
 
 const replyBody = ref("");
 const isInternalNote = ref(false);
@@ -44,6 +49,27 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+
+async function copyCode() {
+  if (!ticket.value) return;
+  try {
+    await navigator.clipboard.writeText(ticket.value.code);
+  } catch {
+    // Ambientes sem permissão/API de clipboard: o código já está visível
+    // na tela para cópia manual.
+  }
+  snackbarText.value = "Código copiado";
+  snackbar.value = true;
+}
+
+function showCreatedNotice() {
+  if (route.query.created !== "1" || !ticket.value) return;
+  snackbarText.value = `Chamado ${ticket.value.code} aberto com sucesso`;
+  snackbar.value = true;
+  const rest = { ...route.query };
+  delete rest.created;
+  router.replace({ query: rest });
 }
 
 async function sendReply() {
@@ -93,7 +119,10 @@ async function assignToMe() {
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  await load();
+  showCreatedNotice();
+});
 </script>
 
 <template>
@@ -107,7 +136,16 @@ onMounted(load);
     <template v-else-if="ticket">
       <div class="d-flex flex-wrap align-center justify-space-between mb-4 ga-2">
         <div>
-          <h1 class="text-h6">{{ ticket.subject }}</h1>
+          <div class="d-flex align-center ga-2 flex-wrap">
+            <h1 class="text-h6 mb-0">{{ ticket.code }} · {{ ticket.subject }}</h1>
+            <v-btn
+              icon="mdi-content-copy"
+              size="small"
+              variant="text"
+              aria-label="Copiar código"
+              @click="copyCode"
+            />
+          </div>
           <p class="text-caption text-medium-emphasis mb-0">
             {{ ticket.offer_name }} · {{ CYCLE_PHASE_LABELS[ticket.cycle_phase_at_opening] }}
           </p>
@@ -216,5 +254,7 @@ onMounted(load);
         </v-col>
       </v-row>
     </template>
+
+    <v-snackbar v-model="snackbar" timeout="3000">{{ snackbarText }}</v-snackbar>
   </div>
 </template>

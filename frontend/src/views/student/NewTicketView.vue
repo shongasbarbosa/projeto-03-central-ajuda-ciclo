@@ -58,7 +58,11 @@ async function submit() {
       subject: subject.value,
       description: description.value,
     });
-    router.push({ name: "ticket-detail", params: { id: ticket.id } });
+    router.push({
+      name: "ticket-detail",
+      params: { id: ticket.id },
+      query: { created: "1" },
+    });
   } catch {
     errorMessage.value = "Não foi possível abrir o chamado. Tente novamente.";
   } finally {
