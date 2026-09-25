@@ -31,4 +31,36 @@ test.describe("Site publicado no GitHub Pages", () => {
     await expect(page).toHaveURL(/#\/atendente\/fila$/);
     await expect(page.getByRole("heading", { name: "Fila de chamados" })).toBeVisible();
   });
+
+  test("stepper de abertura de chamado permite voltar pelo cabeçalho", async ({ page }) => {
+    await page.goto(`${APP_PATH}#/login`);
+    await page.getByRole("button", { name: "Entrar como aluno" }).click();
+    await expect(page).toHaveURL(/#\/tickets$/);
+
+    await page.getByRole("link", { name: "Abrir chamado" }).click();
+    await page.getByLabel("Selecione a oferta").click({ force: true });
+    await page.getByRole("option").first().click();
+    await page.getByLabel("Categoria do problema").click({ force: true });
+    await page.getByRole("option").first().click();
+    await page.getByRole("button", { name: "Continuar" }).click();
+
+    const subjectField = page.getByLabel("Assunto");
+    await subjectField.waitFor({ state: "visible" });
+    await subjectField.fill("Assunto do teste publicado");
+    await page.getByLabel("Descreva o problema").fill("Descrição do teste publicado.");
+    await page.getByRole("button", { name: "Continuar" }).click();
+
+    const submitButton = page.getByRole("button", { name: "Enviar chamado" });
+    await submitButton.waitFor({ state: "visible" });
+
+    await page.getByRole("button", { name: "Voltar para a etapa Descrição" }).click();
+    await expect(page.getByLabel("Assunto")).toHaveValue("Assunto do teste publicado");
+
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await submitButton.waitFor({ state: "visible" });
+    await submitButton.click();
+
+    await expect(page).toHaveURL(/#\/tickets\/\d+$/);
+    await expect(page.getByRole("heading", { name: "Assunto do teste publicado" })).toBeVisible();
+  });
 });
