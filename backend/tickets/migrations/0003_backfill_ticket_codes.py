@@ -3,7 +3,28 @@ from collections import defaultdict
 from django.db import migrations, transaction
 from django.utils import timezone
 
-from tickets.code import compute_monthly_sequences, format_code
+# Esta lógica é uma cópia intencional de tickets/code.py (format_code e
+# compute_monthly_sequences), e não uma importação dela. Migrations de dados
+# devem ser independentes do código "vivo" da aplicação: se, no futuro,
+# format_code ou compute_monthly_sequences mudarem de comportamento (ou
+# forem removidas), esta migration continua reproduzindo exatamente o
+# resultado histórico esperado por quem já a rodou.
+
+
+def _format_code(sequence: int, month: int, year: int) -> str:
+    return f"{sequence:05d}-{month:02d}-{year:04d}"
+
+
+def _compute_monthly_sequences(ordered_rows: list[tuple[int, int, int]]) -> dict[int, int]:
+    """Recebe (id, year, month) já ordenados por data de criação (mais
+    antigo primeiro) e devolve {id: sequence}, reiniciando o sequencial a
+    cada combinação (year, month)."""
+    counters: dict[tuple[int, int], int] = defaultdict(int)
+    sequences: dict[int, int] = {}
+    for pk, year, month in ordered_rows:
+        counters[(year, month)] += 1
+        sequences[pk] = counters[(year, month)]
+    return sequences
 
 
 def backfill_codes(apps, schema_editor):
@@ -16,7 +37,7 @@ def backfill_codes(apps, schema_editor):
             'pk', 'created_at'
         )
     ]
-    sequences = compute_monthly_sequences(rows)
+    sequences = _compute_monthly_sequences(rows)
 
     last_sequence_per_month: dict[tuple[int, int], int] = defaultdict(int)
 
@@ -25,7 +46,7 @@ def backfill_codes(apps, schema_editor):
             sequence = sequences[pk]
             last_sequence_per_month[(year, month)] = sequence
             Ticket.objects.filter(pk=pk).update(
-                code=format_code(sequence, month, year),
+                code=_format_code(sequence, month, year),
                 code_year=year,
                 code_month=month,
                 code_sequence=sequence,
