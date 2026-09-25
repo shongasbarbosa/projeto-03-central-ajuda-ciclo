@@ -37,6 +37,7 @@ class TicketListSerializer(serializers.ModelSerializer):
         model = Ticket
         fields = [
             "id",
+            "code",
             "author",
             "offer",
             "offer_name",

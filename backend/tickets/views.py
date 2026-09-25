@@ -1,6 +1,8 @@
 from django.core.mail import send_mail
+from django.db.models import Q
 from rest_framework import generics, permissions
 
+from .code import parse_code_query
 from .filters import TicketFilter
 from .models import Ticket
 from .permissions import CanEditTicket, IsTicketParticipant
@@ -12,10 +14,10 @@ from .serializers import (
     TicketUpdateSerializer,
 )
 
-STATUS_CHANGE_SUBJECT = "Atualização do seu chamado #{ticket_id}"
+STATUS_CHANGE_SUBJECT = "Atualização do seu chamado {code}"
 STATUS_CHANGE_BODY = (
     "Olá {name},\n\n"
-    "O status do seu chamado #{ticket_id} ({subject}) mudou de "
+    "O status do seu chamado {code} ({subject}) mudou de "
     "'{old_status}' para '{new_status}'.\n\n"
     "Central de Ajuda por Ciclo"
 )
@@ -24,14 +26,36 @@ STATUS_CHANGE_BODY = (
 class TicketListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     filterset_class = TicketFilter
-    search_fields = ["subject", "description"]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Ticket.objects.none()
+
         user = self.request.user
         qs = Ticket.objects.select_related("author", "offer", "assigned_to")
-        if user.is_agent:
-            return qs
-        return qs.filter(author=user)
+        if not user.is_agent:
+            qs = qs.filter(author=user)
+
+        search = self.request.query_params.get("search")
+        if search:
+            qs = self._apply_search(qs, search)
+
+        return qs
+
+    def _apply_search(self, qs, search: str):
+        """Busca pelo código do chamado (completo, número+mês ou só número)
+        quando `search` parece um código; caso contrário, busca por texto
+        em assunto/descrição."""
+        code_query = parse_code_query(search)
+        if code_query is None:
+            return qs.filter(Q(subject__icontains=search) | Q(description__icontains=search))
+
+        qs = qs.filter(code_sequence=code_query.sequence)
+        if code_query.month is not None:
+            qs = qs.filter(code_month=code_query.month)
+        if code_query.year is not None:
+            qs = qs.filter(code_year=code_query.year)
+        return qs
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -57,10 +81,10 @@ class TicketDetailView(generics.RetrieveUpdateAPIView):
         ticket = serializer.save()
         if ticket.status != old_status:
             send_mail(
-                subject=STATUS_CHANGE_SUBJECT.format(ticket_id=ticket.id),
+                subject=STATUS_CHANGE_SUBJECT.format(code=ticket.code),
                 message=STATUS_CHANGE_BODY.format(
                     name=ticket.author.get_full_name() or ticket.author.username,
-                    ticket_id=ticket.id,
+                    code=ticket.code,
                     subject=ticket.subject,
                     old_status=old_status,
                     new_status=ticket.status,
@@ -79,6 +103,8 @@ class TicketMessageListCreateView(generics.ListCreateAPIView):
         return generics.get_object_or_404(Ticket, pk=self.kwargs["ticket_id"])
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Ticket.objects.none()
         ticket = self.get_ticket()
         self.check_object_permissions(self.request, ticket)
         qs = ticket.messages.select_related("author")

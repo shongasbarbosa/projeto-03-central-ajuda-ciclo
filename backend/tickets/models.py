@@ -6,6 +6,24 @@ from django.utils import timezone
 from offers.cycle_phase import CYCLE_PHASE_CHOICES
 from offers.models import Offer
 
+from .code import generate_ticket_code
+
+
+class TicketCodeCounter(models.Model):
+    """Contador de sequencial de código por (ano, mês). Ver tickets/code.py."""
+
+    year = models.PositiveSmallIntegerField()
+    month = models.PositiveSmallIntegerField()
+    last_sequence = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["year", "month"], name="unique_ticket_code_counter")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.month:02d}/{self.year}: {self.last_sequence}"
+
 
 class Ticket(models.Model):
     class Category(models.TextChoices):
@@ -35,6 +53,11 @@ class Ticket(models.Model):
         Status.FECHADO: set(),
     }
 
+    code = models.CharField(max_length=16, unique=True, db_index=True, editable=False)
+    code_year = models.PositiveSmallIntegerField(editable=False)
+    code_month = models.PositiveSmallIntegerField(editable=False)
+    code_sequence = models.PositiveIntegerField(editable=False)
+
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tickets_opened"
     )
@@ -59,14 +82,19 @@ class Ticket(models.Model):
     )
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-code_year", "-code_month", "-code_sequence"]
 
     def __str__(self) -> str:
-        return f"#{self.pk} {self.subject}"
+        return f"{self.code} {self.subject}"
 
     def save(self, *args, **kwargs):
-        if not self.pk and not self.cycle_phase_at_opening:
-            self.cycle_phase_at_opening = self.offer.cycle_phase
+        if not self.pk:
+            if not self.cycle_phase_at_opening:
+                self.cycle_phase_at_opening = self.offer.cycle_phase
+            if not self.code:
+                self.code, self.code_year, self.code_month, self.code_sequence = (
+                    generate_ticket_code()
+                )
         super().save(*args, **kwargs)
 
     def can_transition_to(self, new_status: str) -> bool:

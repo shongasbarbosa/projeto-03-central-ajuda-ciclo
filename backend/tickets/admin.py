@@ -12,7 +12,7 @@ class TicketMessageInline(admin.TabularInline):
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
     list_display = (
-        "id",
+        "code",
         "subject",
         "author",
         "offer",
@@ -24,7 +24,7 @@ class TicketAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("status", "category", "priority", "cycle_phase_at_opening")
-    search_fields = ("subject", "description", "author__username")
+    search_fields = ("code", "subject", "description", "author__username")
     inlines = [TicketMessageInline]
 
 
