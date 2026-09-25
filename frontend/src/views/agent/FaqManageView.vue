@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 
+import FaqTagChips from "@/components/FaqTagChips.vue";
 import { api } from "@/services";
 import type { FaqArticle, TicketCategory } from "@/services/types";
-import { CATEGORY_LABELS, CYCLE_PHASE_LABELS } from "@/utils/labels";
+import { CATEGORY_LABELS, CYCLE_PHASE_LABELS, formatNumber } from "@/utils/labels";
 
 const articles = ref<FaqArticle[]>([]);
 const loading = ref(true);
@@ -88,12 +89,15 @@ onMounted(load);
     <v-progress-linear v-if="loading" indeterminate />
 
     <v-list v-else class="cac-surface">
-      <v-list-item v-for="article in articles" :key="article.id">
+      <v-list-item v-for="article in articles" :key="article.id" class="py-2">
         <v-list-item-title>{{ article.question }}</v-list-item-title>
-        <v-list-item-subtitle>
-          {{ CATEGORY_LABELS[article.category] }} · {{ CYCLE_PHASE_LABELS[article.cycle_phase] }}
-          · 👍 {{ article.helpful_count }} · 👎 {{ article.not_helpful_count }}
-          <span v-if="!article.is_published"> · (não publicado)</span>
+        <v-list-item-subtitle class="mt-1">
+          <FaqTagChips :category="article.category" :cycle-phase="article.cycle_phase" />
+          <div class="mt-1">
+            👍 {{ formatNumber(article.helpful_count) }} · 👎
+            {{ formatNumber(article.not_helpful_count) }}
+            <span v-if="!article.is_published"> · (não publicado)</span>
+          </div>
         </v-list-item-subtitle>
         <template #append>
           <v-btn icon="mdi-pencil" variant="text" aria-label="Editar" @click="openEdit(article)" />

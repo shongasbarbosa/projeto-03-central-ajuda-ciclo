@@ -26,6 +26,36 @@ export const CYCLE_PHASE_LABELS: Record<string, string> = {
   encerramento: "Encerramento",
 };
 
+export const CATEGORY_COLORS: Record<string, string> = {
+  acesso: "primary",
+  matricula: "secondary",
+  conteudo: "success",
+  avaliacao: "warning",
+  certificado: "info",
+  tecnico: "error",
+};
+
+export const CATEGORY_ICONS: Record<string, string> = {
+  acesso: "mdi-lock-outline",
+  matricula: "mdi-school-outline",
+  conteudo: "mdi-book-open-variant",
+  avaliacao: "mdi-clipboard-check-outline",
+  certificado: "mdi-certificate-outline",
+  tecnico: "mdi-wrench-outline",
+};
+
+export const CYCLE_PHASE_COLORS: Record<string, string> = {
+  matricula: "info",
+  andamento: "warning",
+  encerramento: "surface-variant",
+};
+
+export const CYCLE_PHASE_ICONS: Record<string, string> = {
+  matricula: "mdi-calendar-start-outline",
+  andamento: "mdi-progress-clock",
+  encerramento: "mdi-calendar-end-outline",
+};
+
 export const STATUS_COLORS: Record<string, string> = {
   aberto: "info",
   em_andamento: "warning",
@@ -52,8 +82,22 @@ export function formatDate(value: string | null): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(value));
 }
 
+const integerFormatter = new Intl.NumberFormat("pt-BR");
+const oneDecimalFormatter = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+export function formatNumber(value: number): string {
+  return integerFormatter.format(value);
+}
+
+export function formatOneDecimal(value: number): string {
+  return oneDecimalFormatter.format(value);
+}
+
 export function formatHours(value: number | null): string {
   if (value === null || value === undefined) return "—";
-  if (value < 1) return `${Math.round(value * 60)} min`;
-  return `${value.toFixed(1)} h`;
+  if (value < 1) return `${formatNumber(Math.round(value * 60))} min`;
+  return `${formatOneDecimal(value)} h`;
 }

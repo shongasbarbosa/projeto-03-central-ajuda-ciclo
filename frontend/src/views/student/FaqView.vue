@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 
+import FaqTagChips from "@/components/FaqTagChips.vue";
 import { api } from "@/services";
 import type { FaqArticle } from "@/services/types";
-import { CATEGORY_LABELS, CYCLE_PHASE_LABELS } from "@/utils/labels";
 
 const articles = ref<FaqArticle[]>([]);
 const search = ref("");
@@ -56,9 +56,11 @@ onMounted(load);
         <v-expansion-panel-title>
           <div>
             <div>{{ article.question }}</div>
-            <div class="text-caption text-medium-emphasis">
-              {{ CATEGORY_LABELS[article.category] }} · {{ CYCLE_PHASE_LABELS[article.cycle_phase] }}
-            </div>
+            <FaqTagChips
+              class="mt-1"
+              :category="article.category"
+              :cycle-phase="article.cycle_phase"
+            />
           </div>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
