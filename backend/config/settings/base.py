@@ -130,6 +130,16 @@ SPECTACULAR_SETTINGS = {
     ),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # As categorias de Ticket e FaqArticle compartilham os mesmos valores de
+    # choices, assim como cycle_phase (FaqArticle/Offer) e
+    # cycle_phase_at_opening (Ticket); sem essas entradas o drf-spectacular
+    # gera nomes de enum colidentes/arbitrários para cada um.
+    "ENUM_NAME_OVERRIDES": {
+        "TicketCategoryEnum": "tickets.models.Ticket.Category",
+        "TicketPriorityEnum": "tickets.models.Ticket.Priority",
+        "TicketStatusEnum": "tickets.models.Ticket.Status",
+        "CyclePhaseEnum": "offers.cycle_phase.CYCLE_PHASE_CHOICES",
+    },
 }
 
 CORS_ALLOWED_ORIGINS = env.list(

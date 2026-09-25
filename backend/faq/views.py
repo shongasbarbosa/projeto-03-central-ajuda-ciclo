@@ -1,4 +1,5 @@
 from django.db.models import Q
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -23,8 +24,10 @@ class FaqArticleViewSet(viewsets.ModelViewSet):
     search_fields = ["question", "answer"]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return FaqArticle.objects.none()
         qs = FaqArticle.objects.all()
-        if not self.request.user.is_agent:
+        if not self.request.user.is_authenticated or not self.request.user.is_agent:
             qs = qs.filter(is_published=True)
         return qs
 
@@ -51,6 +54,28 @@ class FaqArticleViewSet(viewsets.ModelViewSet):
         return Response(FaqArticleSerializer(article).data)
 
 
+@extend_schema(
+    tags=["faq"],
+    summary="Sugestões de FAQ",
+    description=(
+        "Sugere até 5 artigos publicados com base num texto de busca e, "
+        "opcionalmente, na fase do ciclo de uma oferta. Usado para sugerir "
+        "respostas antes de o aluno abrir um chamado."
+    ),
+    parameters=[
+        OpenApiParameter(
+            name="query", type=str, location=OpenApiParameter.QUERY, required=False
+        ),
+        OpenApiParameter(
+            name="offer",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description="Filtra sugestões pela fase do ciclo dessa oferta.",
+        ),
+    ],
+    responses=FaqArticleSerializer(many=True),
+)
 class FaqSuggestionsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
