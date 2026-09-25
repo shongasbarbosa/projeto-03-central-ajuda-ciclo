@@ -317,13 +317,18 @@ class Command(BaseCommand):
         now = timezone.now()
 
         to_create = target_total - existing
+
+        # Sorteia todos os atributos de cada chamado primeiro, sem criar nada
+        # ainda, e só então ordena por created_at (mais antigo primeiro).
+        # Isso garante que o sequencial de cada mês (gerado por
+        # generate_ticket_code, na ordem em que é chamado) siga a mesma
+        # ordem cronológica de abertura, e não a ordem de sorteio.
+        specs = []
         for i in range(to_create):
             phase = phases[i % len(phases)]
-            offer = offers_by_phase[phase]
             category = categories[i % len(categories)]
             priority = random.choice(priorities)
             author = random.choice(students)
-            subject = random.choice(TICKET_SUBJECTS[category])
 
             status_roll = random.random()
             if status_roll < 0.15:
@@ -337,6 +342,30 @@ class Command(BaseCommand):
 
             age_days = random.randint(1, 150)
             created_at = now - timedelta(days=age_days, hours=random.randint(0, 23))
+
+            specs.append(
+                {
+                    "phase": phase,
+                    "category": category,
+                    "priority": priority,
+                    "author": author,
+                    "status": status,
+                    "created_at": created_at,
+                }
+            )
+
+        specs.sort(key=lambda spec: spec["created_at"])
+
+        for spec in specs:
+            phase = spec["phase"]
+            offer = offers_by_phase[phase]
+            category = spec["category"]
+            priority = spec["priority"]
+            author = spec["author"]
+            status = spec["status"]
+            created_at = spec["created_at"]
+            subject = random.choice(TICKET_SUBJECTS[category])
+
             code, code_year, code_month, code_sequence = generate_ticket_code(
                 reference_dt=created_at
             )

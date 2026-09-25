@@ -72,6 +72,22 @@ def test_seed_demo_without_export_path_writes_default_path(tmp_path, monkeypatch
 
 
 @pytest.mark.django_db
+def test_seed_demo_ticket_codes_follow_chronological_order_per_month():
+    call_command("seed_demo", no_export=True)
+
+    tickets_by_month: dict[tuple[int, int], list[Ticket]] = {}
+    for ticket in Ticket.objects.all():
+        tickets_by_month.setdefault((ticket.code_year, ticket.code_month), []).append(ticket)
+
+    assert len(tickets_by_month) > 1, "seed deveria gerar chamados em mais de um mês"
+
+    for month_tickets in tickets_by_month.values():
+        by_sequence = sorted(month_tickets, key=lambda t: t.code_sequence)
+        by_created_at = sorted(month_tickets, key=lambda t: t.created_at)
+        assert [t.pk for t in by_sequence] == [t.pk for t in by_created_at]
+
+
+@pytest.mark.django_db
 def test_seed_demo_creates_demo_users_with_known_credentials():
     call_command("seed_demo", no_export=True)
 
