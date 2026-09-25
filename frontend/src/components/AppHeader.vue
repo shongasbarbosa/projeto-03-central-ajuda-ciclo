@@ -32,33 +32,35 @@ async function handleLogout() {
 </script>
 
 <template>
-  <v-app-bar :elevation="0" class="px-2 px-md-4">
-    <v-app-bar-title class="text-body-1 font-weight-600">
-      Central de Ajuda por Ciclo
-    </v-app-bar-title>
+  <v-app-bar :elevation="0">
+    <div class="cac-content d-flex align-center">
+      <v-app-bar-title class="text-body-1 font-weight-600">
+        Central de Ajuda por Ciclo
+      </v-app-bar-title>
 
-    <v-tabs v-if="navItems.length" class="d-none d-md-flex" density="comfortable">
-      <v-tab
-        v-for="item in navItems"
-        :key="item.label"
-        :to="item.to"
-        :prepend-icon="item.icon"
-      >
-        {{ item.label }}
-      </v-tab>
-    </v-tabs>
+      <v-tabs v-if="navItems.length" class="d-none d-md-flex" density="comfortable">
+        <v-tab
+          v-for="item in navItems"
+          :key="item.label"
+          :to="item.to"
+          :prepend-icon="item.icon"
+        >
+          {{ item.label }}
+        </v-tab>
+      </v-tabs>
 
-    <v-spacer />
+      <v-spacer />
 
-    <ThemeToggle />
+      <ThemeToggle />
 
-    <v-btn
-      v-if="auth.isAuthenticated"
-      icon="mdi-logout"
-      variant="text"
-      aria-label="Sair"
-      @click="handleLogout"
-    />
+      <v-btn
+        v-if="auth.isAuthenticated"
+        icon="mdi-logout"
+        variant="text"
+        aria-label="Sair"
+        @click="handleLogout"
+      />
+    </div>
   </v-app-bar>
 
   <v-bottom-navigation v-if="navItems.length" class="d-flex d-md-none" grow>

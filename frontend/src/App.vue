@@ -12,14 +12,19 @@ const auth = useAuthStore();
     <AppHeader v-if="auth.isAuthenticated" />
 
     <v-main>
-      <v-container class="px-2 px-md-4 cac-main-container" fluid>
+      <div class="cac-content cac-main-container">
         <router-view />
-      </v-container>
+      </div>
     </v-main>
   </v-app>
 </template>
 
 <style scoped>
+.cac-main-container {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
 @media (max-width: 959.98px) {
   .cac-main-container {
     padding-bottom: 72px;

@@ -37,3 +37,19 @@
   font-weight: 600;
   padding: 6px 12px;
 }
+
+/* Largura máxima e recuo lateral consistentes entre o cabeçalho e o
+   conteúdo das páginas, em todos os tamanhos de tela. */
+.cac-content {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 960px) {
+  .cac-content {
+    padding-inline: 24px;
+  }
+}
