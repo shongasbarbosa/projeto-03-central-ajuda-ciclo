@@ -56,7 +56,13 @@ async function submit() {
   <div>
     <h1 class="text-h6 mb-4">Abrir novo chamado</h1>
 
-    <v-stepper v-model="step" :items="['Oferta', 'Descrição', 'Revisão']" hide-actions>
+    <v-stepper
+      v-model="step"
+      :items="['Oferta', 'Descrição', 'Revisão']"
+      hide-actions
+      :transition="false"
+      :reverse-transition="false"
+    >
       <template #item.1>
         <v-card class="cac-surface pa-4" flat>
           <v-select

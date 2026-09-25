@@ -14,16 +14,18 @@ test.describe("Abertura de chamado (modo demonstração)", () => {
     await page.getByLabel("Categoria do problema").click({ force: true });
     await page.getByRole("option").first().click();
     await page.getByRole("button", { name: "Continuar" }).last().click();
-    await page.waitForTimeout(350);
 
-    await page.getByLabel("Assunto").fill("Não consigo acessar o curso");
+    const subjectField = page.getByLabel("Assunto");
+    await subjectField.waitFor({ state: "visible" });
+    await subjectField.fill("Não consigo acessar o curso");
     await page
       .getByLabel("Descreva o problema")
       .fill("Ao tentar acessar o curso recebo uma tela em branco.");
     await page.getByRole("button", { name: "Continuar" }).last().click();
-    await page.waitForTimeout(350);
 
-    await page.getByRole("button", { name: "Enviar chamado" }).last().click();
+    const submitButton = page.getByRole("button", { name: "Enviar chamado" });
+    await submitButton.waitFor({ state: "visible" });
+    await submitButton.click();
 
     await expect(page).toHaveURL(/#\/tickets\/\d+$/);
     await expect(page.getByRole("heading", { name: "Não consigo acessar o curso" })).toBeVisible();

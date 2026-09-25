@@ -12,8 +12,14 @@ async function loginAs(page: import("@playwright/test").Page, role: "aluno" | "a
 
 async function setTheme(page: import("@playwright/test").Page, theme: "Claro" | "Escuro") {
   await page.getByRole("button", { name: `Tema ${theme}` }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-theme",
+    theme === "Claro" ? "light" : "dark"
+  );
+  // Move o mouse para longe do botão e aguarda o tooltip do Vuetify fechar,
+  // em vez de uma espera fixa, para a captura não sair com o tooltip aberto.
   await page.mouse.move(0, 0);
-  await page.waitForTimeout(200);
+  await page.getByRole("tooltip").waitFor({ state: "hidden" }).catch(() => {});
 }
 
 async function captureFullPage(page: import("@playwright/test").Page, path: string) {
@@ -33,7 +39,7 @@ async function fillNewTicketStep1(page: import("@playwright/test").Page, categor
     await page.getByRole("option").first().click();
   }
   await page.getByRole("button", { name: "Continuar" }).last().click();
-  await page.waitForTimeout(350);
+  await page.getByLabel("Assunto").waitFor({ state: "visible" });
 }
 
 test.describe("Screenshots (modo demonstração)", () => {
@@ -48,7 +54,9 @@ test.describe("Screenshots (modo demonstração)", () => {
     await fillNewTicketStep1(page, "Acesso");
     await page.getByLabel("Assunto").fill("Não consigo acessar minha conta");
     await page.getByLabel("Descreva o problema").fill("Esqueci minha senha de acesso");
-    await page.waitForTimeout(600);
+    // As sugestões chegam após o debounce da busca; espera o texto de
+    // introdução da lista aparecer em vez de um tempo fixo.
+    await page.getByText("Estas respostas podem ajudar").waitFor({ state: "visible" });
     await captureFullPage(page, `${SHOTS_DIR}/02-novo-chamado-sugestoes-faq.png`);
   });
 
@@ -58,8 +66,9 @@ test.describe("Screenshots (modo demonstração)", () => {
     await page.getByLabel("Assunto").fill("Chamado para captura de tela");
     await page.getByLabel("Descreva o problema").fill("Descrição do chamado de exemplo.");
     await page.getByRole("button", { name: "Continuar" }).last().click();
-    await page.waitForTimeout(350);
-    await page.getByRole("button", { name: "Enviar chamado" }).last().click();
+    const submitButton = page.getByRole("button", { name: "Enviar chamado" });
+    await submitButton.waitFor({ state: "visible" });
+    await submitButton.click();
     await expect(page).toHaveURL(/#\/tickets\/\d+$/);
     await captureFullPage(page, `${SHOTS_DIR}/03-detalhe-chamado-aluno.png`);
   });
@@ -77,7 +86,9 @@ test.describe("Screenshots (modo demonstração)", () => {
     await page.getByLabel("Escrever resposta").fill("Nota interna para a equipe de suporte.");
     await page.getByLabel("Nota interna (não visível para o aluno)").check();
     await page.getByRole("button", { name: "Enviar" }).click();
-    await page.waitForTimeout(300);
+    await page
+      .getByText("Nota interna para a equipe de suporte.")
+      .waitFor({ state: "visible" });
     await captureFullPage(page, `${SHOTS_DIR}/05-detalhe-chamado-nota-interna.png`);
   });
 
@@ -86,7 +97,6 @@ test.describe("Screenshots (modo demonstração)", () => {
     await page.getByRole("tab", { name: "Relatórios" }).click();
     await setTheme(page, "Claro");
     await expect(page.getByRole("heading", { name: "Relatórios" })).toBeVisible();
-    await page.waitForTimeout(400);
     await captureFullPage(page, `${SHOTS_DIR}/06-relatorios-claro.png`);
   });
 
@@ -94,7 +104,6 @@ test.describe("Screenshots (modo demonstração)", () => {
     await loginAs(page, "atendente");
     await page.getByRole("tab", { name: "Relatórios" }).click();
     await setTheme(page, "Escuro");
-    await page.waitForTimeout(400);
     await captureFullPage(page, `${SHOTS_DIR}/07-relatorios-escuro.png`);
   });
 
