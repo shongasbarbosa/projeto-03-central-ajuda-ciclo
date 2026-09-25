@@ -67,9 +67,18 @@ class TicketDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsTicketParticipant, CanEditTicket]
 
     def get_queryset(self):
-        return Ticket.objects.select_related("author", "offer", "assigned_to").prefetch_related(
+        if getattr(self, "swagger_fake_view", False):
+            return Ticket.objects.none()
+
+        qs = Ticket.objects.select_related("author", "offer", "assigned_to").prefetch_related(
             "messages", "messages__author"
         )
+        user = self.request.user
+        if not user.is_agent:
+            # Restringe pelo autor para que o chamado de outro aluno resulte
+            # em 404 (via get_object_or_404), sem revelar que ele existe.
+            qs = qs.filter(author=user)
+        return qs
 
     def get_serializer_class(self):
         if self.request.method in ("PATCH", "PUT"):
@@ -100,7 +109,10 @@ class TicketMessageListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsTicketParticipant]
 
     def get_ticket(self) -> Ticket:
-        return generics.get_object_or_404(Ticket, pk=self.kwargs["ticket_id"])
+        qs = Ticket.objects.all()
+        if not self.request.user.is_agent:
+            qs = qs.filter(author=self.request.user)
+        return generics.get_object_or_404(qs, pk=self.kwargs["ticket_id"])
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):

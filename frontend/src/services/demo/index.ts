@@ -41,7 +41,9 @@ function findTicketOr404(id: number): TicketDetail {
 function assertTicketAccess(ticket: TicketDetail, user: User) {
   if (user.role === "atendente") return;
   if (ticket.author.id !== user.id) {
-    throw new ApiError(403, { detail: "Você não tem acesso a este chamado." });
+    // 404, não 403: o aluno não deve conseguir distinguir "não existe" de
+    // "existe, mas não é seu" (mesma semântica da API real).
+    throw new ApiError(404, { detail: "Chamado não encontrado." });
   }
 }
 

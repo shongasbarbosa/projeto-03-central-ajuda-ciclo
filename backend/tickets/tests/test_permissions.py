@@ -45,7 +45,25 @@ def test_student_cannot_access_another_students_ticket(other_student, ticket):
 
     response = client.get(f"/api/tickets/{ticket.id}")
 
-    assert response.status_code == 403
+    # 404, não 403: o aluno não deve conseguir distinguir "não existe" de
+    # "existe, mas não é seu".
+    assert response.status_code == 404
+
+
+def test_student_patch_on_another_students_ticket_is_404(other_student, ticket):
+    client = authenticated_client(other_student)
+
+    response = client.patch(f"/api/tickets/{ticket.id}", {"status": "resolvido"}, format="json")
+
+    assert response.status_code == 404
+
+
+def test_student_messages_on_another_students_ticket_is_404(other_student, ticket):
+    client = authenticated_client(other_student)
+
+    response = client.get(f"/api/tickets/{ticket.id}/messages")
+
+    assert response.status_code == 404
 
 
 def test_agent_sees_all_tickets(agent, ticket):

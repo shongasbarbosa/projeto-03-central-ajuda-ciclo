@@ -123,4 +123,4 @@ def test_student_cannot_access_another_students_ticket_by_id(student, other_stud
 
     response = client.get(f"/api/tickets/{other_student_ticket.id}")
 
-    assert response.status_code == 403
+    assert response.status_code == 404
