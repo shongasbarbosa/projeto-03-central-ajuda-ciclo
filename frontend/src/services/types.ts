@@ -106,6 +106,11 @@ export interface ReportCategoryRow {
   avg_resolution_hours: number | null;
 }
 
+export interface ReportPriorityRow {
+  priority: TicketPriority;
+  total: number;
+}
+
 export interface ReportSummary {
   total_tickets: number;
   by_status: Record<string, number>;
@@ -163,6 +168,7 @@ export interface ApiService {
   };
   reports: {
     ticketsByCyclePhase(offer?: number): Promise<ReportPhaseRow[]>;
+    ticketsByPriority(offer?: number): Promise<ReportPriorityRow[]>;
     avgResolutionTime(category?: TicketCategory, offer?: number): Promise<ReportCategoryRow[]>;
     summary(): Promise<ReportSummary>;
   };

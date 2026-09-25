@@ -291,6 +291,21 @@ export const demoApi: ApiService = {
       });
     },
 
+    async ticketsByPriority(offer) {
+      requireAgent();
+      let tickets = demoState.tickets;
+      if (offer) tickets = tickets.filter((t) => t.offer === offer);
+
+      const byPriority = new Map<string, number>();
+      for (const ticket of tickets) {
+        byPriority.set(ticket.priority, (byPriority.get(ticket.priority) ?? 0) + 1);
+      }
+
+      return Array.from(byPriority.entries())
+        .map(([priority, total]) => ({ priority: priority as TicketDetail["priority"], total }))
+        .sort((a, b) => a.priority.localeCompare(b.priority));
+    },
+
     async avgResolutionTime(category, offer) {
       requireAgent();
       let tickets = demoState.tickets.filter((t) => t.resolved_at);

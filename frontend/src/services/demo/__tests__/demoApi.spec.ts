@@ -104,6 +104,24 @@ describe("demoApi.tickets permissões", () => {
   });
 });
 
+describe("demoApi.reports", () => {
+  it("agrupa chamados por prioridade", async () => {
+    await demoApi.auth.login("atendente.demo", "");
+
+    const rows = await demoApi.reports.ticketsByPriority();
+
+    const total = rows.reduce((sum, row) => sum + row.total, 0);
+    expect(total).toBe(demoState.tickets.length);
+    expect(rows.every((row) => ["baixa", "media", "alta"].includes(row.priority))).toBe(true);
+  });
+
+  it("nega acesso a alunos", async () => {
+    await demoApi.auth.login("aluno.demo", "");
+
+    await expect(demoApi.reports.ticketsByPriority()).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
 describe("demoApi.faq", () => {
   it("incrementa o contador de feedback útil", async () => {
     await demoApi.auth.login("aluno.demo", "");

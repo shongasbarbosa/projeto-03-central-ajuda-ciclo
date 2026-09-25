@@ -5,6 +5,7 @@ import type {
   Offer,
   ReportCategoryRow,
   ReportPhaseRow,
+  ReportPriorityRow,
   ReportSummary,
   TicketDetail,
   TicketFilters,
@@ -99,6 +100,11 @@ export const realApi: ApiService = {
   reports: {
     async ticketsByCyclePhase(offer) {
       return request<ReportPhaseRow[]>("/reports/tickets-by-cycle-phase", {
+        params: { offer },
+      });
+    },
+    async ticketsByPriority(offer) {
+      return request<ReportPriorityRow[]>("/reports/tickets-by-priority", {
         params: { offer },
       });
     },

@@ -5,10 +5,16 @@ import { computed, onMounted, ref } from "vue";
 import EChart from "@/components/EChart.vue";
 import { useAppTheme } from "@/composables/useTheme";
 import { api } from "@/services";
-import type { ReportCategoryRow, ReportPhaseRow, ReportSummary } from "@/services/types";
+import type {
+  ReportCategoryRow,
+  ReportPhaseRow,
+  ReportPriorityRow,
+  ReportSummary,
+} from "@/services/types";
 import {
   CATEGORY_LABELS,
   CYCLE_PHASE_LABELS,
+  PRIORITY_LABELS,
   STATUS_LABELS,
   formatHours,
   formatNumber,
@@ -18,11 +24,13 @@ import {
 const { isDark } = useAppTheme();
 
 const phaseData = ref<ReportPhaseRow[]>([]);
+const priorityData = ref<ReportPriorityRow[]>([]);
 const categoryData = ref<ReportCategoryRow[]>([]);
 const summary = ref<ReportSummary | null>(null);
 const loading = ref(true);
 
 const textColor = computed(() => (isDark.value ? "#E7E9F0" : "#1A1C22"));
+const splitLineColor = computed(() => (isDark.value ? "#2A2E38" : "#E3E5EC"));
 const paletteBySeries = ["#1E4FD8", "#4A5CC5", "#2AA876", "#946200", "#C4281C", "#7C9BFF"];
 
 function formatAxisNumber(value: number): string {
@@ -48,7 +56,7 @@ const phaseChartOption = computed<EChartsOption>(() => ({
   yAxis: {
     type: "value",
     axisLabel: { color: textColor.value, formatter: formatAxisNumber },
-    splitLine: { lineStyle: { color: isDark.value ? "#2A2E38" : "#E3E5EC" } },
+    splitLine: { lineStyle: { color: splitLineColor.value } },
   },
   series: [
     {
@@ -65,6 +73,50 @@ const phaseChartOption = computed<EChartsOption>(() => ({
   ],
 }));
 
+const priorityOrder: Array<ReportPriorityRow["priority"]> = ["baixa", "media", "alta"];
+
+const priorityChartOption = computed<EChartsOption>(() => {
+  const orderedData = priorityOrder
+    .map((priority) => priorityData.value.find((row) => row.priority === priority))
+    .filter((row): row is ReportPriorityRow => Boolean(row));
+
+  return {
+    animation: false,
+    backgroundColor: "transparent",
+    textStyle: { color: textColor.value },
+    color: paletteBySeries,
+    tooltip: {
+      trigger: "axis",
+      valueFormatter: (value) => formatNumber(Number(value)),
+    },
+    grid: { left: 48, right: 16, top: 24, bottom: 32 },
+    xAxis: {
+      type: "category",
+      data: orderedData.map((row) => PRIORITY_LABELS[row.priority]),
+      axisLabel: { color: textColor.value },
+      axisLine: { lineStyle: { color: textColor.value } },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: textColor.value, formatter: formatAxisNumber },
+      splitLine: { lineStyle: { color: splitLineColor.value } },
+    },
+    series: [
+      {
+        name: "Chamados",
+        type: "bar",
+        data: orderedData.map((row) => row.total),
+        label: {
+          show: true,
+          position: "top",
+          color: textColor.value,
+          formatter: (params) => formatNumber(Number(params.value)),
+        },
+      },
+    ],
+  };
+});
+
 const categoryChartOption = computed<EChartsOption>(() => ({
   animation: false,
   backgroundColor: "transparent",
@@ -74,18 +126,20 @@ const categoryChartOption = computed<EChartsOption>(() => ({
     trigger: "axis",
     valueFormatter: (value) => `${formatOneDecimal(Number(value))} h`,
   },
-  grid: { left: 48, right: 16, top: 24, bottom: 64 },
+  // Barras horizontais: os nomes das categorias ficam legíveis sem
+  // precisar inclinar o texto do eixo.
+  grid: { left: 96, right: 24, top: 16, bottom: 32 },
   xAxis: {
-    type: "category",
-    data: categoryData.value.map((row) => CATEGORY_LABELS[row.category]),
-    axisLabel: { color: textColor.value, rotate: 20 },
-    axisLine: { lineStyle: { color: textColor.value } },
-  },
-  yAxis: {
     type: "value",
     name: "horas",
     axisLabel: { color: textColor.value, formatter: formatAxisNumber },
-    splitLine: { lineStyle: { color: isDark.value ? "#2A2E38" : "#E3E5EC" } },
+    splitLine: { lineStyle: { color: splitLineColor.value } },
+  },
+  yAxis: {
+    type: "category",
+    data: categoryData.value.map((row) => CATEGORY_LABELS[row.category]),
+    axisLabel: { color: textColor.value },
+    axisLine: { lineStyle: { color: textColor.value } },
   },
   series: [
     {
@@ -94,7 +148,7 @@ const categoryChartOption = computed<EChartsOption>(() => ({
       data: categoryData.value.map((row) => row.avg_resolution_hours ?? 0),
       label: {
         show: true,
-        position: "top",
+        position: "right",
         color: textColor.value,
         formatter: (params) => formatOneDecimal(Number(params.value)),
       },
@@ -137,6 +191,14 @@ const phaseSummaryText = computed(() =>
     .join(". ")
 );
 
+const prioritySummaryText = computed(() =>
+  priorityOrder
+    .map((priority) => priorityData.value.find((row) => row.priority === priority))
+    .filter((row): row is ReportPriorityRow => Boolean(row))
+    .map((row) => `${PRIORITY_LABELS[row.priority]}: ${formatNumber(row.total)} chamados`)
+    .join(". ")
+);
+
 const categorySummaryText = computed(() =>
   categoryData.value
     .map(
@@ -162,12 +224,14 @@ const statusSummaryText = computed(() =>
 onMounted(async () => {
   loading.value = true;
   try {
-    const [phases, categories, summaryData] = await Promise.all([
+    const [phases, priorities, categories, summaryData] = await Promise.all([
       api.reports.ticketsByCyclePhase(),
+      api.reports.ticketsByPriority(),
       api.reports.avgResolutionTime(),
       api.reports.summary(),
     ]);
     phaseData.value = phases;
+    priorityData.value = priorities;
     categoryData.value = categories;
     summary.value = summaryData;
   } finally {
@@ -217,6 +281,12 @@ onMounted(async () => {
         </v-col>
         <v-col cols="12" md="6">
           <v-card class="cac-surface pa-4" flat>
+            <h2 class="text-subtitle-1 mb-2">Chamados por prioridade</h2>
+            <EChart :option="priorityChartOption" :summary="prioritySummaryText" />
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="6">
+          <v-card class="cac-surface pa-4" flat>
             <h2 class="text-subtitle-1 mb-2">Tempo médio de resolução por categoria</h2>
             <EChart :option="categoryChartOption" :summary="categorySummaryText" />
           </v-card>
@@ -225,12 +295,7 @@ onMounted(async () => {
           <v-card class="cac-surface pa-4" flat>
             <h2 class="text-subtitle-1 mb-2">Resumo por status</h2>
             <EChart :option="statusChartOption" :summary="statusSummaryText" />
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="6">
-          <v-card class="cac-surface pa-4" flat>
-            <h2 class="text-subtitle-1 mb-2">Chamados por status</h2>
-            <v-table density="comfortable">
+            <v-table density="comfortable" class="mt-2">
               <thead>
                 <tr>
                   <th>Status</th>
