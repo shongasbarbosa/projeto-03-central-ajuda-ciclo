@@ -388,6 +388,10 @@ Cobrem login como aluno e como atendente, abertura de chamado, bloqueio de
 telas do atendente para o aluno e logout — tanto no modo demonstração
 quanto contra a API real servida pelo Docker.
 
+Há também `npm run test:e2e:published`, que roda contra o site já publicado
+no GitHub Pages (login como aluno e atendente, persistência de tema,
+recarregamento de rota interna e logout).
+
 **Screenshots** (Playwright, modo demonstração):
 
 ```bash
