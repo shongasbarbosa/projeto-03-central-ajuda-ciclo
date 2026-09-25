@@ -1,4 +1,5 @@
 import pytest
+from django.core import mail
 
 from conftest import authenticated_client
 from tickets.models import Ticket, TicketMessage
@@ -98,6 +99,19 @@ def test_agent_cannot_close_ticket_without_resolving(agent, ticket):
     response = client.patch(f"/api/tickets/{ticket.id}", {"status": "fechado"}, format="json")
 
     assert response.status_code == 400
+
+
+def test_status_change_email_includes_ticket_code(agent, ticket):
+    client = authenticated_client(agent)
+
+    response = client.patch(f"/api/tickets/{ticket.id}", {"status": "resolvido"}, format="json")
+
+    assert response.status_code == 200
+    assert len(mail.outbox) == 1
+    sent = mail.outbox[0]
+    ticket.refresh_from_db()
+    assert ticket.code in sent.subject
+    assert ticket.code in sent.body
 
 
 def test_student_cannot_create_internal_note(student, ticket):
