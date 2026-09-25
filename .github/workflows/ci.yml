@@ -58,6 +58,11 @@ jobs:
             sleep 2
           done
 
+      - name: Conceder privilégios para o banco de teste
+        run: |
+          mysql -h127.0.0.1 -uroot -e \
+            "GRANT ALL PRIVILEGES ON *.* TO 'central_ajuda_ciclo'@'%'; FLUSH PRIVILEGES;"
+
       - name: Testes (pytest)
         run: pytest -v
 
