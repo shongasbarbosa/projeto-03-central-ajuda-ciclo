@@ -262,6 +262,7 @@ Documentação interativa completa em `/api/docs` (Swagger) e `/api/redoc`
 | GET    | `/api/faq/suggestions`                 | Sugestões de FAQ por texto/oferta            |
 | POST   | `/api/faq/{id}/feedback`               | Registra feedback útil/não útil              |
 | GET    | `/api/reports/tickets-by-cycle-phase`  | Volume e tempo médio por fase do ciclo       |
+| GET    | `/api/reports/tickets-by-priority`     | Volume de chamados por prioridade            |
 | GET    | `/api/reports/avg-resolution-time`     | Tempo médio de resolução por categoria       |
 | GET    | `/api/reports/summary`                 | Totais por status e tempos médios            |
 | GET    | `/api/health`                          | Healthcheck                                  |
