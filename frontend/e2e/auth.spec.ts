@@ -32,11 +32,19 @@ test.describe("Autenticação (modo demonstração)", () => {
     await page.getByRole("button", { name: "Entrar como aluno" }).click();
     await expect(page).toHaveURL(/#\/tickets$/);
 
+    // Navega para uma segunda tela protegida com push (não replace), para
+    // que exista uma entrada real no histórico do navegador a ser revisitada
+    // pelo botão "voltar" depois do logout.
+    await page.getByRole("link", { name: "Abrir chamado" }).click();
+    await expect(page).toHaveURL(/#\/tickets\/novo$/);
+
     await page.getByRole("button", { name: "Sair" }).click();
     await expect(page).toHaveURL(/#\/login$/);
 
-    // Navegar de volta não deve expor novamente a tela protegida.
-    await page.goto("/#/tickets");
+    // O botão "voltar" não pode expor novamente a tela protegida: o guard
+    // do router deve interceptar a navegação e redirecionar ao login.
+    await page.goBack();
     await expect(page).toHaveURL(/#\/login$/);
+    await expect(page.getByRole("button", { name: "Entrar", exact: true })).toBeVisible();
   });
 });

@@ -40,10 +40,15 @@ test.describe("Autenticação (API real via Docker)", () => {
     await login(page, "aluno.demo", "aluno12345");
     await expect(page).toHaveURL(/#\/tickets$/);
 
+    await page.getByRole("link", { name: "Abrir chamado" }).click();
+    await expect(page).toHaveURL(/#\/tickets\/novo$/);
+
     await page.getByRole("button", { name: "Sair" }).click();
     await expect(page).toHaveURL(/#\/login$/);
 
-    await page.goto("/#/tickets");
+    // O botão "voltar" não pode expor novamente a tela protegida.
+    await page.goBack();
     await expect(page).toHaveURL(/#\/login$/);
+    await expect(page.getByRole("button", { name: "Entrar", exact: true })).toBeVisible();
   });
 });
