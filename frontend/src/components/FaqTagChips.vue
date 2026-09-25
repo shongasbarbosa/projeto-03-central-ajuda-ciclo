@@ -15,7 +15,7 @@ defineProps<{ category: string; cyclePhase: string }>();
   <div class="d-flex ga-2 flex-wrap">
     <v-chip
       size="small"
-      variant="tonal"
+      variant="flat"
       :color="CATEGORY_COLORS[category]"
       :prepend-icon="CATEGORY_ICONS[category]"
     >
@@ -23,7 +23,7 @@ defineProps<{ category: string; cyclePhase: string }>();
     </v-chip>
     <v-chip
       size="small"
-      variant="tonal"
+      variant="flat"
       :color="CYCLE_PHASE_COLORS[cyclePhase]"
       :prepend-icon="CYCLE_PHASE_ICONS[cyclePhase]"
     >
