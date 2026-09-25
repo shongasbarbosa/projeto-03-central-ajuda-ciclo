@@ -20,8 +20,15 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
+
+# Quantas vezes tentar de novo, com uma transação nova a cada tentativa,
+# se a corrida pela criação do contador do mês falhar (ver docstring de
+# generate_ticket_code). Em condições normais, no máximo uma das threads
+# concorrentes falha uma vez; a margem extra é só para não desistir cedo
+# demais sob concorrência incomum.
+_MAX_ATTEMPTS = 5
 
 
 def format_code(sequence: int, month: int, year: int) -> str:
@@ -45,8 +52,19 @@ def compute_monthly_sequences(ordered_rows: list[tuple[int, int, int]]) -> dict[
 def generate_ticket_code(reference_dt: datetime | None = None) -> tuple[str, int, int, int]:
     """Gera o próximo código de chamado para o mês de `reference_dt`.
 
-    Retorna (code, year, month, sequence). Deve ser chamada dentro de uma
-    transação (o `select_for_update` só bloqueia efetivamente nesse caso).
+    Retorna (code, year, month, sequence).
+
+    No primeiro chamado de um mês novo, a linha do contador ainda não
+    existe, e `select_for_update` só bloqueia uma linha já existente — não
+    impede que duas transações concorrentes tentem, ao mesmo tempo,
+    inserir a linha (ano, mês) pela primeira vez via `get_or_create`. Sob
+    isolamento REPEATABLE READ (padrão do MySQL/InnoDB), a segunda
+    transação pode falhar com `IntegrityError` na constraint de
+    unicidade e, ao tentar apenas reler a linha para se recuperar, ainda
+    não enxergá-la (seu snapshot foi tirado antes do commit da primeira).
+    Por isso a tentativa inteira roda de novo em uma transação nova (com
+    um snapshot novo, que já vê a linha recém-criada) em vez de só
+    relançar o erro.
     """
     from .models import TicketCodeCounter
 
@@ -54,15 +72,22 @@ def generate_ticket_code(reference_dt: datetime | None = None) -> tuple[str, int
     local_dt = timezone.localtime(reference_dt)
     year, month = local_dt.year, local_dt.month
 
-    with transaction.atomic():
-        counter, created = TicketCodeCounter.objects.get_or_create(year=year, month=month)
-        if not created:
-            counter = TicketCodeCounter.objects.select_for_update().get(pk=counter.pk)
-        counter.last_sequence += 1
-        counter.save(update_fields=["last_sequence"])
-        sequence = counter.last_sequence
+    last_error: IntegrityError | None = None
+    for _ in range(_MAX_ATTEMPTS):
+        try:
+            with transaction.atomic():
+                counter, created = TicketCodeCounter.objects.get_or_create(year=year, month=month)
+                if not created:
+                    counter = TicketCodeCounter.objects.select_for_update().get(pk=counter.pk)
+                counter.last_sequence += 1
+                counter.save(update_fields=["last_sequence"])
+                sequence = counter.last_sequence
+            return format_code(sequence, month, year), year, month, sequence
+        except IntegrityError as exc:
+            last_error = exc
+            continue
 
-    return format_code(sequence, month, year), year, month, sequence
+    raise last_error
 
 
 @dataclass

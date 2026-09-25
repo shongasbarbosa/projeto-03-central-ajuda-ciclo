@@ -127,6 +127,46 @@ def test_generate_ticket_code_is_unique_under_concurrent_creation():
     assert counter.last_sequence == 15
 
 
+@pytest.mark.django_db(transaction=True)
+def test_generate_ticket_code_survives_race_to_create_first_counter_of_month():
+    """Nenhuma linha de TicketCodeCounter existe ainda para (2027, 1): força
+    várias threads a competirem pela criação dessa primeira linha ao mesmo
+    tempo (em vez de uma corrida "solta" como no teste acima), para exercer
+    de forma confiável o caminho de retentativa em generate_ticket_code."""
+    reference_dt = timezone.make_aware(datetime(2027, 1, 15, 12, 0))
+    codes: list[str] = []
+    lock = threading.Lock()
+    errors: list[Exception] = []
+    thread_count = 10
+    barrier = threading.Barrier(thread_count)
+
+    def worker():
+        from django.db import connections
+
+        try:
+            barrier.wait()
+            code, *_ = generate_ticket_code(reference_dt=reference_dt)
+            with lock:
+                codes.append(code)
+        except Exception as exc:  # pragma: no cover - assertion below fails anyway
+            errors.append(exc)
+        finally:
+            connections.close_all()
+
+    threads = [threading.Thread(target=worker) for _ in range(thread_count)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"generate_ticket_code falhou sob concorrência: {errors}"
+    assert len(codes) == thread_count
+    assert len(set(codes)) == thread_count, "códigos duplicados gerados sob concorrência"
+
+    counter = TicketCodeCounter.objects.get(year=2027, month=1)
+    assert counter.last_sequence == thread_count
+
+
 @pytest.mark.django_db
 def test_tickets_are_ordered_chronologically_by_code_not_alphabetically(
     student, offer_matricula
