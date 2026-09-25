@@ -63,6 +63,12 @@ jobs:
           mysql -h127.0.0.1 -uroot -e \
             "GRANT ALL PRIVILEGES ON *.* TO 'central_ajuda_ciclo'@'%'; FLUSH PRIVILEGES;"
 
+      - name: Checar migrations pendentes
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Validar schema OpenAPI (drf-spectacular)
+        run: python manage.py spectacular --validate --fail-on-warn --file /tmp/schema.yml
+
       - name: Testes (pytest)
         run: pytest -v
 
