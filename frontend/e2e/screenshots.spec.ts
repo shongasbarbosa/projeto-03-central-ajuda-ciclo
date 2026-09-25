@@ -16,10 +16,12 @@ async function setTheme(page: import("@playwright/test").Page, theme: "Claro" | 
     "data-theme",
     theme === "Claro" ? "light" : "dark"
   );
-  // Move o mouse para longe do botão e aguarda o tooltip do Vuetify fechar,
-  // em vez de uma espera fixa, para a captura não sair com o tooltip aberto.
+  // O tooltip do Vuetify abre tanto por hover quanto por foco: mover o mouse
+  // não basta, já que o botão clicado continua focado. Tira o foco do botão
+  // antes da captura para o tooltip fechar.
+  await page.getByRole("heading", { name: "Relatórios" }).click();
   await page.mouse.move(0, 0);
-  await page.getByRole("tooltip").waitFor({ state: "hidden" }).catch(() => {});
+  await page.getByRole("tooltip", { name: theme }).waitFor({ state: "hidden" }).catch(() => {});
 }
 
 async function captureFullPage(page: import("@playwright/test").Page, path: string) {
