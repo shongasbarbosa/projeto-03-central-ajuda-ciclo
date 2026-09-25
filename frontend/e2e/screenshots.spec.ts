@@ -116,6 +116,13 @@ test.describe("Screenshots (modo demonstração)", () => {
     await captureFullPage(page, `${SHOTS_DIR}/08-faq.png`);
   });
 
+  test("gerenciar faq - atendente", async ({ page }) => {
+    await loginAs(page, "atendente");
+    await page.getByRole("tab", { name: "FAQ" }).click();
+    await expect(page.getByRole("heading", { name: "Gerenciar FAQ" })).toBeVisible();
+    await captureFullPage(page, `${SHOTS_DIR}/10-gerenciar-faq.png`);
+  });
+
   test("mobile 360px", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await loginAs(page, "aluno");
