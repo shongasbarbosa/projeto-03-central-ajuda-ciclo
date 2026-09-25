@@ -250,6 +250,15 @@ lados:
 | Dar feedback em artigo da FAQ            | ✅                | ✅        |
 | Ver relatórios                           | ❌                | ✅        |
 
+O chamado de outro aluno não aparece como "acesso negado" (403): a API e o
+modo demonstração retornam **404** ("Chamado não encontrado") tanto em
+`GET` quanto em `PATCH` e nas mensagens (`/api/tickets/{id}/messages`), sem
+distinguir "não existe" de "existe, mas não é seu" — o mesmo vale para
+buscas por código de protocolo (ver seção acima). Isso é feito restringindo
+o queryset por autor para alunos *antes* de qualquer checagem de permissão
+de objeto, para que o aluno nunca receba uma resposta que confirme a
+existência do chamado de outra pessoa.
+
 ## Transições de status
 
 ```mermaid
@@ -284,7 +293,18 @@ Todo chamado recebe, na abertura, um código no formato **`NNNNN-MM-AAAA`**
   (uma operação muito rápida), sem travar a tabela de chamados inteira, e
   garante que dois chamados abertos ao mesmo tempo nunca recebam o mesmo
   código — coberto por um teste automatizado que dispara 15 threads
-  simultâneas.
+  simultâneas. No primeiro chamado de um mês novo (quando a linha do
+  contador ainda não existe), duas transações podem competir para criá-la
+  ao mesmo tempo; `generate_ticket_code` detecta esse `IntegrityError` de
+  corrida e tenta de novo em uma transação nova, coberto por um teste
+  dedicado a esse cenário.
+- **Podem existir lacunas na numeração** (ex.: `00007` seguido de
+  `00009`, sem o `00008`): isso é intencional. O contador nunca é
+  decrementado — um chamado que falha para criar por outro motivo depois
+  de já ter consumido um sequencial, ou uma tentativa de retentativa sob
+  concorrência, não "devolve" o número. Priorizar nunca duplicar um
+  código (o que quebraria a busca e a identificação do chamado) é mais
+  importante do que uma numeração sem nenhuma lacuna.
 - Chamados existentes antes desta funcionalidade foram migrados por uma
   migration de dados que atribui os códigos em ordem cronológica de
   abertura, mês a mês.
@@ -305,7 +325,7 @@ Todo chamado recebe, na abertura, um código no formato **`NNNNN-MM-AAAA`**
     de outro aluno — a busca resulta em lista vazia, sem revelar se o
     código existe.
 
-## Filtros persistentes na URL
+## Filtros persistentes entre telas
 
 Nas quatro telas com listas filtráveis (fila do atendente, "Meus
 chamados", FAQ do aluno e gestão de FAQ), o estado dos filtros — busca,
@@ -326,6 +346,21 @@ cada tecla digitada). Isso significa que:
   filtro ativo, ao lado de um indicador com a quantidade de filtros
   ativos);
 - ao fazer logout, nenhum filtro fica retido para a próxima sessão.
+
+A URL sozinha resolve o botão "voltar" do navegador, mas não a navegação
+pelo menu: sair pela aba "FAQ" e clicar de novo em "Fila de chamados" abre
+a rota do zero, sem query alguma. Por isso a última query de cada lista
+também é guardada em um **store Pinia persistido em `sessionStorage`**
+(`useListFiltersStore`), isolado por id de usuário — a sessão demo troca de
+perfil sem recarregar a página, e os filtros de um perfil não devem
+aparecer para o próximo login. Ao entrar em uma dessas rotas sem query, a
+última query salva é restaurada via `router.replace`; se a rota já chega
+com algum parâmetro de filtro (link compartilhado ou "voltar" do
+navegador), a URL tem prioridade sobre o valor salvo. Tudo é limpo no
+logout. A lógica comum às quatro telas (ler/restaurar da URL ou do store,
+sincronizar de volta, contar filtros ativos, limpar) está no composable
+`frontend/src/composables/useListFilters.ts`, reutilizado por todas elas
+em vez de duplicado.
 
 ## Endpoints da API
 
@@ -454,22 +489,28 @@ ruff check .
 pytest -v
 ```
 
-94 testes cobrindo a regra de fase do ciclo, transições de status,
+98 testes cobrindo a regra de fase do ciclo, transições de status,
 permissões por papel (incluindo um aluno tentando acessar o chamado de
-outro aluno e ver notas internas ou o código de outro aluno), geração e
-busca do código de protocolo (formato, reinício mensal, limite de fuso
-horário em `America/Sao_Paulo`, concorrência com 15 threads simultâneas,
-migração de dados e todas as variações de busca), sugestões de FAQ,
-relatórios (incluindo a ordem fixa e o total zero do relatório por
-prioridade) e idempotência do `seed_demo`. Os testes rodam contra um MySQL
-real (nunca SQLite).
+outro aluno — 404, não 403, em `GET`, `PATCH` e mensagens — e ver notas
+internas ou o código de outro aluno), geração e busca do código de
+protocolo (formato, reinício mensal, limite de fuso horário em
+`America/Sao_Paulo`, concorrência com 15 threads simultâneas incluindo o
+primeiro chamado de um mês novo, e todas as variações de busca), a
+migration de dados que preenche o código dos chamados antigos (testada de
+verdade com `MigrationExecutor`: volta o banco para o estado anterior à
+migration, cria chamados sem código em meses diferentes, aplica a
+migration e confere código/ordem/contadores resultantes — não apenas a
+função pura de cálculo do sequencial), ordem cronológica dos códigos
+gerados pelo `seed_demo`, sugestões de FAQ, relatórios (incluindo a ordem
+fixa e o total zero do relatório por prioridade) e idempotência do
+`seed_demo`. Os testes rodam contra um MySQL real (nunca SQLite).
 
 **Frontend** (`cd frontend`):
 
 ```bash
 npm run lint
 npx vue-tsc -b
-npm run test:unit      # Vitest — 68 testes
+npm run test:unit      # Vitest — 80 testes
 npm run build
 ```
 
@@ -484,9 +525,9 @@ PLAYWRIGHT_REAL_API=true npm run test:e2e:real  # contra a API real
 Cobrem login como aluno e como atendente, abertura de chamado, bloqueio de
 telas do atendente para o aluno e logout, geração/cópia/busca do código de
 protocolo (incluindo busca só pelo número retornando chamados de meses
-diferentes) e persistência de filtros na URL (navegação, recarregamento e
-limpeza) — tanto no modo demonstração quanto contra a API real servida
-pelo Docker.
+diferentes) e persistência de filtros (navegação com o botão "voltar" do
+navegador, navegação pelo menu entre abas, recarregamento e limpeza) —
+tanto no modo demonstração quanto contra a API real servida pelo Docker.
 
 Há também `npm run test:e2e:published`, que roda contra o site já publicado
 no GitHub Pages (login como aluno e atendente, persistência de tema,
