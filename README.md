@@ -76,7 +76,7 @@ Todas capturadas no modo demonstração (Playwright, `npm run screenshots`).
 
 ## Stack
 
-**Backend:** Python 3.13, Django 5, Django REST Framework,
+**Backend:** Python 3.13, Django 5.2 LTS, Django REST Framework,
 djangorestframework-simplejwt, drf-spectacular, django-filter,
 django-cors-headers, django-environ, PyMySQL, MySQL 8.4, gunicorn, ruff,
 pytest-django.
